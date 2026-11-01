@@ -241,13 +241,16 @@ def get_traffic_analytics(period_hours: int = 24) -> Dict[str, Any]:
     conn = get_connection()
 
     # Fine-grained adaptive bucketing:
-    # 1 hour -> 30s buckets
-    # 24 hours -> 120s (2 min) buckets
-    # 7 days -> 1800s (30 min) buckets
+    # 1 hour -> 30s buckets (~120 points)
+    # 6 hours -> 120s (2 min) buckets (~180 points)
+    # 24 hours -> 600s (10 min) buckets (~144 points)
+    # 7 days -> 1800s (30 min) buckets (~336 points)
     if period_hours <= 1:
         bucket_sec = 30
-    elif period_hours <= 24:
+    elif period_hours <= 6:
         bucket_sec = 120
+    elif period_hours <= 24:
+        bucket_sec = 600
     else:
         bucket_sec = 1800
 
@@ -306,9 +309,9 @@ def get_internet_health_analytics() -> Dict[str, Any]:
     start_time = now - (24 * 3600)
     conn = get_connection()
 
-    # Latency over time (120s buckets)
+    # Latency over time (600s / 10-minute buckets: 144 points for smooth 24h curve)
     health_timeline = conn.execute("""
-        SELECT (timestamp / 120) * 120 as bucket, 
+        SELECT (timestamp / 600) * 600 as bucket, 
                AVG(internet_latency_ms) as avg_internet_lat,
                AVG(gateway_latency_ms) as avg_gw_lat,
                AVG(packet_loss_pct) as avg_packet_loss,
@@ -347,7 +350,7 @@ def get_internet_health_analytics() -> Dict[str, Any]:
     } for r in health_timeline]
 
     if len(points) == 1:
-        points.insert(0, {"time": points[0]["time"] - 120, "internet_lat": points[0]["internet_lat"], "gateway_lat": points[0]["gateway_lat"], "packet_loss": 0, "online": True})
+        points.insert(0, {"time": points[0]["time"] - 600, "internet_lat": points[0]["internet_lat"], "gateway_lat": points[0]["gateway_lat"], "packet_loss": 0, "online": True})
 
     return {
         "uptime_pct": uptime_pct,

@@ -187,19 +187,19 @@
           </div>
 
           <div class="card stat-card">
-            <div class="stat-info">
+            <div class="stat-info" style="min-width: 0; overflow: hidden;">
               <div class="stat-label">Live WAN Speed (SNMP ppp0)</div>
-              <div style="display: flex; gap: 14px; align-items: baseline; margin-top: 2px;">
-                <div>
-                  <span style="font-size: 0.68rem; font-weight: 700; color: var(--accent-cyan);">↓ DOWN</span>
-                  <div class="stat-value" id="stat-snmp-down" style="font-size: 1.25rem; color: var(--accent-cyan); margin: 0;">0.0 Kbps</div>
+              <div style="display: flex; gap: 10px; align-items: baseline; margin-top: 2px; flex-wrap: nowrap; overflow: hidden;">
+                <div style="min-width: 0; flex: 1;">
+                  <span style="font-size: 0.65rem; font-weight: 700; color: var(--accent-cyan); display: block; line-height: 1.1;">↓ DOWN</span>
+                  <div class="stat-value" id="stat-snmp-down" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.3px;">0.0 Kbps</div>
                 </div>
-                <div>
-                  <span style="font-size: 0.68rem; font-weight: 700; color: #c084fc;">↑ UP</span>
-                  <div class="stat-value" id="stat-snmp-up" style="font-size: 1.25rem; color: #c084fc; margin: 0;">0.0 Kbps</div>
+                <div style="min-width: 0; flex: 1;">
+                  <span style="font-size: 0.65rem; font-weight: 700; color: #c084fc; display: block; line-height: 1.1;">↑ UP</span>
+                  <div class="stat-value" id="stat-snmp-up" style="font-size: 1.05rem; color: #c084fc; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.3px;">0.0 Kbps</div>
                 </div>
               </div>
-              <div class="stat-sub">Clients: <span id="stat-current-rate">0 B/s</span></div>
+              <div class="stat-sub" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Clients: <span id="stat-current-rate">0 B/s</span></div>
             </div>
             <div class="stat-icon cyan">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -330,12 +330,15 @@
       <!-- VIEW 3: DEVICE DETAILS DEEP DIVE -->
       <section id="view-device-detail" class="view-section">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
-          <button class="btn btn-secondary" onclick="switchView('devices')" style="padding: 6px 14px; font-size: 0.82rem;">
-            &larr; Back to Devices
+          <button class="btn btn-secondary" id="telemetry-back-btn" onclick="navigateBackFromTelemetry()" style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; font-size: 0.84rem; font-weight: 500; border-radius: 8px; transition: all 0.2s ease;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span id="telemetry-back-label">Back to Devices</span>
           </button>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Select Device:</span>
-            <select id="telemetry-device-select" class="form-control" style="width: 280px; padding: 6px 12px; font-size: 0.85rem;">
+          
+          <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 4px 14px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan); flex-shrink: 0;"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+            <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Switch Device:</span>
+            <select id="telemetry-device-select" class="form-control" style="width: 290px; padding: 6px 10px; font-size: 0.85rem; border: none; background: transparent; cursor: pointer; outline: none;">
               <!-- Populated dynamically -->
             </select>
           </div>
@@ -632,58 +635,113 @@
 
       <!-- VIEW 8: SETTINGS -->
       <section id="view-settings" class="view-section">
-        <div class="card" style="max-width: 650px;">
-          <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;">Router Monitoring Preferences</h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px;">Configure connection details to communicate with your TP-Link router.</p>
-
-          <form id="settings-form">
-            <div class="form-group">
-              <label>Internet Service Provider (ISP Name)</label>
-              <input type="text" id="setting-isp-name" class="form-control" placeholder="Local ISP">
-              <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Displays on the upstream WAN node in the network topology diagram.</span>
-            </div>
-            <div class="form-group">
-              <label>Router Web Management URL</label>
-              <input type="text" id="setting-router-url" class="form-control" placeholder="http://192.168.0.1" required>
-            </div>
-            <div class="form-group">
-              <label>Router Username</label>
-              <input type="text" id="setting-router-user" class="form-control" placeholder="user" required>
-            </div>
-            <div class="form-group">
-              <label>Router Admin Password</label>
-              <input type="password" id="setting-router-password" class="form-control" placeholder="••••••••••••" autocomplete="new-password">
-              <span id="pwd-status-text" style="font-size: 0.75rem; color: var(--accent-green); margin-top: 4px; display: block;"></span>
-            </div>
-            <div class="form-group">
-              <label>Background Polling Interval (Seconds)</label>
-              <input type="number" id="setting-poll-interval" class="form-control" min="3" max="60" value="5" required>
-            </div>
-
-            <div style="border-top: 1px solid var(--border-color); margin: 20px 0 16px; padding-top: 16px;">
-              <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 6px;">SNMP v2c Telemetry Settings</h4>
-              <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 14px;">High-speed UDP telemetry for real-time split WAN upload/download and physical port diagnostics.</p>
-              
-              <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <input type="checkbox" id="setting-snmp-enabled" checked style="width: 18px; height: 18px; cursor: pointer;">
-                <label for="setting-snmp-enabled" style="margin: 0; cursor: pointer; font-size: 0.88rem;">Enable High-Speed SNMP v2c Monitoring</label>
-              </div>
-
-              <div class="grid grid-cols-2" style="gap: 12px;">
-                <div class="form-group" style="margin: 0;">
-                  <label>SNMP Community String</label>
-                  <input type="text" id="setting-snmp-community" class="form-control" placeholder="sumitsakpal0183" required>
+        <form id="settings-form" style="max-width: 1100px;">
+          <div class="grid grid-cols-2" style="gap: 20px; align-items: stretch; margin-bottom: 20px;">
+            
+            <!-- Left Card: Router & Web Credentials -->
+            <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <div style="background: rgba(37, 99, 235, 0.15); color: var(--accent-blue); padding: 7px; border-radius: 8px; display: inline-flex;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="14" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></svg>
+                  </div>
+                  <div>
+                    <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">Router Access & Management</h3>
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">TP-Link gateway web management & scraping preferences</div>
+                  </div>
                 </div>
-                <div class="form-group" style="margin: 0;">
-                  <label>SNMP UDP Port</label>
-                  <input type="number" id="setting-snmp-port" class="form-control" value="161" required>
+
+                <div class="form-group" style="margin-top: 18px;">
+                  <label>Internet Service Provider (ISP Name)</label>
+                  <input type="text" id="setting-isp-name" class="form-control" placeholder="Local ISP">
+                  <span style="font-size: 0.74rem; color: var(--text-muted); margin-top: 3px; display: block;">Displays on upstream WAN node in the network topology.</span>
+                </div>
+
+                <div class="form-group">
+                  <label>Router Web Management URL</label>
+                  <input type="text" id="setting-router-url" class="form-control" placeholder="http://192.168.0.1" required>
+                </div>
+
+                <div class="grid grid-cols-2" style="gap: 12px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label>Router Username</label>
+                    <input type="text" id="setting-router-user" class="form-control" placeholder="user" required>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label>Admin Password</label>
+                    <input type="password" id="setting-router-password" class="form-control" placeholder="••••••••••••" autocomplete="new-password">
+                  </div>
+                </div>
+                <span id="pwd-status-text" style="font-size: 0.74rem; color: var(--accent-green); margin-top: 4px; display: block; margin-bottom: 14px;"></span>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Background Polling Interval (Seconds)</label>
+                  <input type="number" id="setting-poll-interval" class="form-control" min="3" max="60" value="5" required>
+                  <span style="font-size: 0.74rem; color: var(--text-muted); margin-top: 3px; display: block;">Frequency of client inventory and status checks.</span>
                 </div>
               </div>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Save & Restart Collector</button>
-          </form>
-        </div>
+            <!-- Right Card: SNMP Telemetry -->
+            <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); padding: 7px; border-radius: 8px; display: inline-flex;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div>
+                      <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">SNMP v2c Telemetry Subsystem</h3>
+                      <div style="color: var(--text-muted); font-size: 0.8rem;">High-speed UDP telemetry for real-time WAN & ports</div>
+                    </div>
+                  </div>
+                  <span class="category-badge iot" style="font-size: 0.72rem; padding: 2px 8px;">Hybrid 3.0</span>
+                </div>
+
+                <div style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin-top: 18px; margin-bottom: 16px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="setting-snmp-enabled" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent-cyan);">
+                    <label for="setting-snmp-enabled" style="margin: 0; cursor: pointer; font-size: 0.9rem; font-weight: 600;">Enable High-Speed SNMP v2c Monitoring</label>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; margin-left: 28px;">
+                    Polls ppp0 WAN octets every 2.5s for split download/upload speedometer and hardware ports matrix.
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2" style="gap: 12px; margin-bottom: 16px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label>Community String</label>
+                    <input type="text" id="setting-snmp-community" class="form-control" placeholder="sumitsakpal0183" required>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label>SNMP UDP Port</label>
+                    <input type="number" id="setting-snmp-port" class="form-control" value="161" required>
+                  </div>
+                </div>
+
+                <div style="background: rgba(6, 182, 212, 0.05); border: 1px dashed rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 12px; font-size: 0.76rem; color: var(--text-muted);">
+                  <div style="font-weight: 600; color: var(--accent-cyan); margin-bottom: 4px;">Verified Hardware Parameters:</div>
+                  <ul style="margin: 0; padding-left: 18px; line-height: 1.5;">
+                    <li>Target: <code>192.168.0.1:161</code> (SNMPv2c, Community auth)</li>
+                    <li>WAN Index 4 (<code>ppp0</code>) download &amp; upload counters</li>
+                    <li>Zero login sessions created; no router web session timeouts</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Action Bar -->
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              Changes take effect immediately and collectors auto-reconnect with new credentials.
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 9px 24px; font-size: 0.9rem; font-weight: 600;">
+              Save &amp; Restart Collector
+            </button>
+          </div>
+        </form>
       </section>
 
     </main>

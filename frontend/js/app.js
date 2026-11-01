@@ -29,7 +29,12 @@ function updateThemeButtonUI(theme) {
 }
 
 // Navigation & View Routing
+let previousView = 'dashboard';
+
 function switchView(viewName) {
+  if (currentView !== viewName && currentView !== 'device-detail') {
+    previousView = currentView;
+  }
   currentView = viewName;
   document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
@@ -71,6 +76,14 @@ function refreshCurrentView() {
   else if (currentView === 'history') loadConnectionHistory();
   else if (currentView === 'reports') loadReports();
   else if (currentView === 'settings') loadSettings();
+}
+
+function navigateBackFromTelemetry() {
+  if (previousView && previousView !== 'device-detail') {
+    switchView(previousView);
+  } else {
+    switchView('devices');
+  }
 }
 
 // Formatters
@@ -434,16 +447,17 @@ function renderTopologyMap(overviewData, devices) {
   const ispFilter = isInternetOnline ? '' : 'filter="url(#glow-red)"';
   const ispLedColor = isInternetOnline ? '#10b981' : '#ef4444';
   const ispLedFilter = isInternetOnline ? 'filter="url(#glow-green)"' : 'filter="url(#glow-red)"';
-  const ispStatusText = isInternetOnline ? 'ISP • Connected' : '● Internet Outage / Disconnected';
+  const ispStatusText = isInternetOnline ? 'ISP • Connected' : '● Disconnected';
   const ispStatusColor = isInternetOnline ? ispTextSub : '#f43f5e';
+  const ispTitleText = isInternetOnline ? ispName : `${ispName} (Offline)`;
 
   svgContent += `
     <g class="topo-node" onclick="switchView('health')" style="cursor: pointer;">
-      <rect x="370" y="42" width="220" height="54" rx="14" fill="${ispCardFill}" stroke="${ispStroke}" stroke-width="${isInternetOnline ? 1.5 : 2}" ${ispFilter}/>
+      <rect x="360" y="42" width="240" height="54" rx="14" fill="${ispCardFill}" stroke="${ispStroke}" stroke-width="${isInternetOnline ? 1.5 : 2}" ${ispFilter}/>
       <!-- Inner Icon Box -->
-      <rect x="382" y="49" width="40" height="40" rx="10" fill="${ispIconBox}"/>
+      <rect x="372" y="49" width="40" height="40" rx="10" fill="${ispIconBox}"/>
       <!-- Modem / ISP Icon -->
-      <g transform="translate(390, 57)" stroke="${ispIconStroke}" stroke-width="1.8" fill="none">
+      <g transform="translate(380, 57)" stroke="${ispIconStroke}" stroke-width="1.8" fill="none">
         <rect x="1" y="7" width="22" height="9" rx="2"/>
         <line x1="5" y1="1" x2="5" y2="7"/>
         <line x1="19" y1="1" x2="19" y2="7"/>
@@ -451,10 +465,10 @@ function renderTopologyMap(overviewData, devices) {
         <circle cx="11" cy="11.5" r="1.5" fill="${ispLedColor}" ${ispLedFilter}/>
       </g>
       <!-- Labels -->
-      <text x="432" y="66" fill="${isInternetOnline ? ispTextMain : '#f43f5e'}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">
-        ${ispName}${isInternetOnline ? '' : ' (Outage)'}
+      <text x="422" y="66" fill="${isInternetOnline ? ispTextMain : '#f43f5e'}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">
+        ${ispTitleText}
       </text>
-      <text x="432" y="82" fill="${ispStatusColor}" font-size="11" font-weight="${isInternetOnline ? 400 : 600}" font-family="system-ui, sans-serif">
+      <text x="422" y="82" fill="${ispStatusColor}" font-size="11" font-weight="${isInternetOnline ? 400 : 600}" font-family="system-ui, sans-serif">
         ${ispStatusText}
       </text>
     </g>
@@ -465,28 +479,28 @@ function renderTopologyMap(overviewData, devices) {
   const rFilter = isRouterDown ? 'filter="url(#glow-amber)"' : 'filter="url(#glow-blue)"';
   const rIconBoxFill = isRouterDown ? (isDark ? '#2b2108' : '#fef3c7') : routerIconBox;
   const rIconColor = isRouterDown ? '#f59e0b' : routerIconStroke;
-  const rTitleText = isRouterDown ? 'TP-Link Router 1 (Rebooting)' : 'TP-Link Router 1';
+  const rTitleText = isRouterDown ? 'TP-Link (Rebooting)' : 'TP-Link Router 1';
   const rTitleColor = isRouterDown ? '#f59e0b' : routerTextMain;
-  const rSubText = isRouterDown ? '192.168.0.1 (Diagnostic Reboot)' : '192.168.0.1 (Gateway)';
+  const rSubText = isRouterDown ? '192.168.0.1 • Rebooting' : '192.168.0.1 (Gateway)';
   const rSubColor = isRouterDown ? '#fbbf24' : routerTextSub;
 
   svgContent += `
     <g class="topo-node" onclick="openRouterModal()" style="cursor: pointer;">
       <title>${isRouterDown ? 'Gateway Router is Rebooting' : 'Click for Router Diagnostics & Reboot'}</title>
-      <rect x="365" y="206" width="230" height="64" rx="14" fill="${routerFill}" stroke="${rBorderColor}" stroke-width="${isRouterDown ? 2.5 : 2}" ${rFilter}/>
+      <rect x="355" y="206" width="250" height="64" rx="14" fill="${routerFill}" stroke="${rBorderColor}" stroke-width="${isRouterDown ? 2.5 : 2}" ${rFilter}/>
       <!-- Inner Icon Box -->
-      <rect x="377" y="218" width="40" height="40" rx="10" fill="${rIconBoxFill}"/>
+      <rect x="367" y="218" width="40" height="40" rx="10" fill="${rIconBoxFill}"/>
       <!-- Router / Screen Icon -->
-      <g transform="translate(385, 226)" stroke="${rIconColor}" stroke-width="1.8" fill="none">
+      <g transform="translate(375, 226)" stroke="${rIconColor}" stroke-width="1.8" fill="none">
         <rect x="2" y="2" width="20" height="14" rx="2"/>
         <line x1="8" y1="20" x2="16" y2="20"/>
         <line x1="12" y1="16" x2="12" y2="20"/>
       </g>
       <!-- Labels -->
-      <text x="428" y="233" fill="${rTitleColor}" font-size="13.5" font-weight="700" font-family="system-ui, sans-serif">
+      <text x="418" y="233" fill="${rTitleColor}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">
         ${rTitleText}
       </text>
-      <text x="428" y="252" fill="${rSubColor}" font-size="11.5" font-weight="${isRouterDown ? 600 : 400}" font-family="system-ui, sans-serif">
+      <text x="418" y="252" fill="${rSubColor}" font-size="11" font-weight="${isRouterDown ? 600 : 400}" font-family="system-ui, sans-serif">
         ${rSubText}
       </text>
     </g>
@@ -631,6 +645,8 @@ function renderDashboardSparkline(points, snmpPoints) {
       charts.dashboardTraffic.data.labels = labels;
       charts.dashboardTraffic.data.datasets[0].data = dlValues;
       charts.dashboardTraffic.data.datasets[1].data = ulValues;
+      charts.dashboardTraffic.data.datasets[0].pointRadius = 0;
+      charts.dashboardTraffic.data.datasets[1].pointRadius = 0;
       charts.dashboardTraffic.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       charts.dashboardTraffic.update('none');
       return;
@@ -640,32 +656,42 @@ function renderDashboardSparkline(points, snmpPoints) {
       charts.dashboardTraffic.destroy();
     }
 
+    const gradDl = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
+    gradDl.addColorStop(0, 'rgba(6, 182, 212, 0.28)');
+    gradDl.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+    const gradUl = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
+    gradUl.addColorStop(0, 'rgba(192, 132, 252, 0.22)');
+    gradUl.addColorStop(1, 'rgba(192, 132, 252, 0.0)');
+
     charts.dashboardTraffic = new Chart(ctx, {
       type: 'line',
       data: {
         labels,
         datasets: [
           {
-            label: 'Download (ppp0)',
+            label: '↓ Download (ppp0)',
             data: dlValues,
             borderColor: '#06b6d4',
-            backgroundColor: 'rgba(6, 182, 212, 0.15)',
+            backgroundColor: gradDl,
             fill: true,
-            tension: 0.35,
-            borderWidth: 2,
-            pointRadius: 2,
-            pointHoverRadius: 5
+            tension: 0.38,
+            borderWidth: 2.2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHitRadius: 10
           },
           {
-            label: 'Upload (ppp0)',
+            label: '↑ Upload (ppp0)',
             data: ulValues,
             borderColor: '#c084fc',
-            backgroundColor: 'rgba(192, 132, 252, 0.12)',
+            backgroundColor: gradUl,
             fill: true,
-            tension: 0.35,
-            borderWidth: 2,
-            pointRadius: 2,
-            pointHoverRadius: 5
+            tension: 0.38,
+            borderWidth: 2.2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHitRadius: 10
           }
         ]
       },
@@ -711,6 +737,7 @@ function renderDashboardSparkline(points, snmpPoints) {
   if (charts.dashboardTraffic && charts.dashboardTraffic.data.datasets.length === 1) {
     charts.dashboardTraffic.data.labels = labels;
     charts.dashboardTraffic.data.datasets[0].data = values;
+    charts.dashboardTraffic.data.datasets[0].pointRadius = 0;
     charts.dashboardTraffic.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
     charts.dashboardTraffic.update();
     return;
@@ -720,6 +747,10 @@ function renderDashboardSparkline(points, snmpPoints) {
     charts.dashboardTraffic.destroy();
   }
 
+  const gradFallback = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
+  gradFallback.addColorStop(0, 'rgba(6, 182, 212, 0.25)');
+  gradFallback.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
   charts.dashboardTraffic = new Chart(ctx, {
     type: 'line',
     data: {
@@ -728,12 +759,13 @@ function renderDashboardSparkline(points, snmpPoints) {
         label: 'Live Bandwidth',
         data: values,
         borderColor: '#06b6d4',
-        backgroundColor: 'rgba(6, 182, 212, 0.15)',
+        backgroundColor: gradFallback,
         fill: true,
-        tension: 0.35,
+        tension: 0.38,
         borderWidth: 2,
-        pointRadius: 2,
-        pointHoverRadius: 5
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHitRadius: 10
       }]
     },
     options: {
@@ -870,12 +902,19 @@ async function loadDeviceDetail(mac) {
   }
   currentDetailMac = mac;
 
+  // Update back button label depending on origin
+  const backLabel = document.getElementById('telemetry-back-label');
+  if (backLabel) {
+    backLabel.textContent = (previousView === 'dashboard') ? 'Back to Dashboard' : 'Back to Devices';
+  }
+
   // Populate device switcher dropdown
   const selector = document.getElementById('telemetry-device-select');
   if (selector && allDevicesCache.length > 0) {
-    selector.innerHTML = allDevicesCache.map(d => `
+    const sorted = [...allDevicesCache].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0));
+    selector.innerHTML = sorted.map(d => `
       <option value="${d.mac}" ${d.mac === mac ? 'selected' : ''}>
-        ${escapeHtml(d.custom_name)} (${d.ip}) — ${d.is_active ? 'Active' : 'Offline'}
+        ${d.is_active ? '🟢 [Online]' : '⚪ [Offline]'} ${escapeHtml(d.custom_name)} (${d.ip})
       </option>
     `).join('');
     selector.value = mac;
@@ -919,8 +958,8 @@ async function loadDeviceDetail(mac) {
     } else {
       evtContainer.innerHTML = data.events.map(e => `
         <div class="event-item">
-          <div class="event-icon-badge" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div class="event-icon-badge" style="${getEventBadgeColor(e.event_type)}">
+            ${getEventIcon(e.event_type)}
           </div>
           <div class="event-details">
             <div class="event-title-row">
@@ -1023,9 +1062,14 @@ async function loadTrafficAnalytics() {
     const values = data.timeline.map(p => p.bytes);
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
+    const grad = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
+    grad.addColorStop(0, 'rgba(139, 92, 246, 0.32)');
+    grad.addColorStop(1, 'rgba(139, 92, 246, 0.0)');
+
     if (charts.trafficAnalytics) {
       charts.trafficAnalytics.data.labels = labels;
       charts.trafficAnalytics.data.datasets[0].data = values;
+      charts.trafficAnalytics.data.datasets[0].pointRadius = 0;
       charts.trafficAnalytics.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       charts.trafficAnalytics.resize();
       charts.trafficAnalytics.update();
@@ -1038,12 +1082,13 @@ async function loadTrafficAnalytics() {
             label: 'Network Consumption',
             data: values,
             borderColor: '#8b5cf6',
-            backgroundColor: 'rgba(139, 92, 246, 0.18)',
+            backgroundColor: grad,
             fill: true,
-            tension: 0.35,
-            borderWidth: 2,
-            pointRadius: 2,
-            pointHoverRadius: 6
+            tension: 0.38,
+            borderWidth: 2.2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHitRadius: 10
           }]
         },
         options: {
@@ -1235,6 +1280,8 @@ async function loadInternetHealth() {
       charts.healthLatency.data.labels = labels;
       charts.healthLatency.data.datasets[0].data = wanLat;
       charts.healthLatency.data.datasets[1].data = gwLat;
+      charts.healthLatency.data.datasets[0].pointRadius = 0;
+      charts.healthLatency.data.datasets[1].pointRadius = 0;
       charts.healthLatency.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       charts.healthLatency.resize();
       charts.healthLatency.update();
@@ -1249,18 +1296,22 @@ async function loadInternetHealth() {
               data: wanLat,
               borderColor: '#3b82f6',
               backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              tension: 0.3,
+              tension: 0.35,
               borderWidth: 2,
-              pointRadius: 2
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHitRadius: 10
             },
             {
               label: 'Gateway Latency (ms)',
               data: gwLat,
               borderColor: '#10b981',
               backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              tension: 0.3,
+              tension: 0.35,
               borderWidth: 2,
-              pointRadius: 2
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHitRadius: 10
             }
           ]
         },
@@ -1268,7 +1319,7 @@ async function loadInternetHealth() {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
             y: {
               grid: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' },
               ticks: { callback: v => `${v}ms`, font: { size: 10 } }
@@ -1282,10 +1333,18 @@ async function loadInternetHealth() {
     if (data.outages.length === 0) {
       outContainer.innerHTML = `<p style="color: var(--accent-green); font-size: 0.85rem; font-weight: 500;">Zero connection outages detected in the last 24 hours.</p>`;
     } else {
-      outContainer.innerHTML = data.outages.map(o => `
+      outContainer.innerHTML = data.outages.map(o => {
+        const isResolved = o.event_type === 'OUTAGE_RESOLVED' || (o.title && o.title.toLowerCase().includes('restored'));
+        const badgeBg = isResolved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)';
+        const badgeColor = isResolved ? 'var(--accent-green)' : 'var(--accent-rose)';
+        const iconSvg = isResolved 
+          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="9 11 12 14 20 6" stroke-width="2.5"/></svg>`
+          : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+        return `
         <div class="event-item">
-          <div class="event-icon-badge" style="background: rgba(244, 63, 94, 0.15); color: var(--accent-rose);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <div class="event-icon-badge" style="background: ${badgeBg}; color: ${badgeColor};">
+            ${iconSvg}
           </div>
           <div class="event-details">
             <div class="event-title-row">
@@ -1295,7 +1354,8 @@ async function loadInternetHealth() {
             <div class="event-desc">${escapeHtml(o.description)}</div>
           </div>
         </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // Router Hardware Ports & Interface Matrix via SNMP
@@ -1381,7 +1441,7 @@ async function loadConnectionHistory() {
 
     container.innerHTML = events.map(e => `
       <div class="event-item">
-        <div class="event-icon-badge" style="background: ${getEventBadgeColor(e.event_type)};">
+        <div class="event-icon-badge" style="${getEventBadgeColor(e.event_type)}">
           ${getEventIcon(e.event_type)}
         </div>
         <div class="event-details">
@@ -1399,14 +1459,64 @@ async function loadConnectionHistory() {
 }
 
 function getEventBadgeColor(type) {
-  if (type === 'DEVICE_CONNECTED' || type === 'OUTAGE_RESOLVED') return 'rgba(16, 185, 129, 0.15); color: var(--accent-green)';
-  if (type === 'DEVICE_DISCONNECTED' || type === 'OUTAGE_START') return 'rgba(244, 63, 94, 0.15); color: var(--accent-rose)';
-  if (type === 'IP_CHANGED') return 'rgba(245, 158, 11, 0.15); color: var(--accent-amber)';
-  return 'rgba(6, 182, 212, 0.15); color: var(--accent-cyan)';
+  switch (type) {
+    case 'DEVICE_DISCONNECTED':
+      return 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose);';
+    case 'DEVICE_CONNECTED':
+      return 'background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan);';
+    case 'DEVICE_DISCOVERED':
+      return 'background: rgba(16, 185, 129, 0.15); color: var(--accent-green);';
+    case 'ROUTER_REBOOT':
+    case 'ROUTER_REBOOT_SNMP':
+      return 'background: rgba(245, 158, 11, 0.15); color: var(--accent-amber);';
+    case 'ROUTER_RECONNECT':
+      return 'background: rgba(16, 185, 129, 0.15); color: var(--accent-green);';
+    case 'OUTAGE_START':
+      return 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose);';
+    case 'OUTAGE_RESOLVED':
+      return 'background: rgba(16, 185, 129, 0.15); color: var(--accent-green);';
+    case 'IP_CHANGED':
+      return 'background: rgba(168, 85, 247, 0.15); color: #c084fc;';
+    case 'DEVICE_UPDATED':
+      return 'background: rgba(148, 163, 184, 0.15); color: var(--text-muted);';
+    default:
+      return 'background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);';
+  }
 }
 
 function getEventIcon(type) {
-  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+  switch (type) {
+    case 'DEVICE_DISCONNECTED':
+      // Device Offline: WiFi Off / Disconnected icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`;
+    case 'DEVICE_CONNECTED':
+      // Device Reconnected: WiFi connected icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`;
+    case 'DEVICE_DISCOVERED':
+      // New Device Added: Plus / Sparkle icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="12" x="3" y="4" rx="2"/><path d="M12 16v4m-4 0h8"/><path d="M12 7v6m-3-3h6"/></svg>`;
+    case 'ROUTER_REBOOT':
+    case 'ROUTER_REBOOT_SNMP':
+      // Router Rebooted: Circular restart icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+    case 'ROUTER_RECONNECT':
+      // Router Back Online: Server check icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/><path d="m14 10 2 2 4-4"/></svg>`;
+    case 'OUTAGE_START':
+      // Internet Connection Disconnected / Outage
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`;
+    case 'OUTAGE_RESOLVED':
+      // Internet Connection Restored
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><polyline points="9 11 12 14 20 6" stroke-width="2.2"/></svg>`;
+    case 'IP_CHANGED':
+      // IP Changed icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>`;
+    case 'DEVICE_UPDATED':
+      // Device Details Updated icon
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+    default:
+      return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+  }
 }
 
 // 7. Reports & Insights
