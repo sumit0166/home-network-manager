@@ -73,6 +73,21 @@ def init_db():
         key TEXT PRIMARY KEY,
         value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS snmp_wan_traffic (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        elapsed REAL,
+        download_bytes INTEGER,
+        upload_bytes INTEGER,
+        download_mbps REAL,
+        upload_mbps REAL,
+        in_octets INTEGER NOT NULL,
+        out_octets INTEGER NOT NULL,
+        sys_uptime INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_snmp_wan_time ON snmp_wan_traffic(timestamp);
     """)
     
     # Migrations for existing tables
@@ -83,7 +98,10 @@ def init_db():
     if "interface" not in cols:
         cursor.execute("ALTER TABLE devices ADD COLUMN interface TEXT;")
 
-    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('isp_name', 'Local ISP');")
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('isp_name', 'Hathway');")
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('snmp_enabled', '1');")
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('snmp_community', 'sumitsakpal0183');")
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('snmp_port', '161');")
 
     conn.commit()
     conn.close()

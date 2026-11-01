@@ -188,12 +188,21 @@
 
           <div class="card stat-card">
             <div class="stat-info">
-              <div class="stat-label">Live Network Rate</div>
-              <div class="stat-value" id="stat-current-rate" style="color: var(--accent-cyan);">0 B/s</div>
-              <div class="stat-sub">Instantaneous throughput</div>
+              <div class="stat-label">Live WAN Speed (SNMP ppp0)</div>
+              <div style="display: flex; gap: 14px; align-items: baseline; margin-top: 2px;">
+                <div>
+                  <span style="font-size: 0.68rem; font-weight: 700; color: var(--accent-cyan);">↓ DOWN</span>
+                  <div class="stat-value" id="stat-snmp-down" style="font-size: 1.25rem; color: var(--accent-cyan); margin: 0;">0.0 Kbps</div>
+                </div>
+                <div>
+                  <span style="font-size: 0.68rem; font-weight: 700; color: #c084fc;">↑ UP</span>
+                  <div class="stat-value" id="stat-snmp-up" style="font-size: 1.25rem; color: #c084fc; margin: 0;">0.0 Kbps</div>
+                </div>
+              </div>
+              <div class="stat-sub">Clients: <span id="stat-current-rate">0 B/s</span></div>
             </div>
             <div class="stat-icon cyan">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m17 19-5 3-5-3"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
           </div>
 
@@ -530,6 +539,37 @@
           </div>
         </div>
 
+        <!-- Router Hardware Ports & Interface Matrix -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h4 style="font-size: 1rem; font-weight: 600; margin: 0;">Router Hardware Ports & Interface Matrix</h4>
+              <span class="category-badge iot" id="snmp-status-pill">SNMP v2c</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);" id="router-hw-badge">
+              Hardware Uptime: <span id="snmp-hw-uptime" style="color: var(--accent-green); font-weight: 600;">--</span>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table" style="font-size: 0.83rem;">
+              <thead>
+                <tr>
+                  <th>Interface</th>
+                  <th>Hardware / Role</th>
+                  <th>Status</th>
+                  <th>MAC Address</th>
+                  <th>Packet Errors (In / Out)</th>
+                  <th>Discards</th>
+                </tr>
+              </thead>
+              <tbody id="snmp-interfaces-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Scanning router interfaces via SNMP...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card">
           <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Internet Outage & Recovery Log</h4>
           <div class="event-timeline" id="health-outage-timeline">
@@ -618,6 +658,27 @@
             <div class="form-group">
               <label>Background Polling Interval (Seconds)</label>
               <input type="number" id="setting-poll-interval" class="form-control" min="3" max="60" value="5" required>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); margin: 20px 0 16px; padding-top: 16px;">
+              <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 6px;">SNMP v2c Telemetry Settings</h4>
+              <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 14px;">High-speed UDP telemetry for real-time split WAN upload/download and physical port diagnostics.</p>
+              
+              <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <input type="checkbox" id="setting-snmp-enabled" checked style="width: 18px; height: 18px; cursor: pointer;">
+                <label for="setting-snmp-enabled" style="margin: 0; cursor: pointer; font-size: 0.88rem;">Enable High-Speed SNMP v2c Monitoring</label>
+              </div>
+
+              <div class="grid grid-cols-2" style="gap: 12px;">
+                <div class="form-group" style="margin: 0;">
+                  <label>SNMP Community String</label>
+                  <input type="text" id="setting-snmp-community" class="form-control" placeholder="sumitsakpal0183" required>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label>SNMP UDP Port</label>
+                  <input type="number" id="setting-snmp-port" class="form-control" value="161" required>
+                </div>
+              </div>
             </div>
 
             <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Save & Restart Collector</button>

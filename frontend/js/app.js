@@ -82,6 +82,14 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+function formatMbps(mbps) {
+  if (mbps === undefined || mbps === null || isNaN(mbps)) return '0.0 Kbps';
+  if (mbps < 1.0) {
+    return `${(mbps * 1000).toFixed(1)} Kbps`;
+  }
+  return `${mbps.toFixed(2)} Mbps`;
+}
+
 function timeAgo(unixTimestamp) {
   if (!unixTimestamp) return 'Never';
   const seconds = Math.floor(Date.now() / 1000 - unixTimestamp);
@@ -118,13 +126,18 @@ function toggleTopoFilter() {
 
 async function loadDashboard() {
   try {
-    const [overviewRes, devicesRes] = await Promise.all([
+    const [overviewRes, devicesRes, snmpRes] = await Promise.all([
       fetch('/api/overview'),
-      fetch('/api/devices')
+      fetch('/api/devices'),
+      fetch('/api/snmp/live').catch(() => null)
     ]);
     if (!overviewRes.ok || !devicesRes.ok) return;
     const data = await overviewRes.json();
     const devices = await devicesRes.json();
+    let snmpData = null;
+    if (snmpRes && snmpRes.ok) {
+      try { snmpData = await snmpRes.json(); } catch (e) {}
+    }
     latestOverviewData = data;
     allDevicesCache = devices;
 
@@ -132,6 +145,15 @@ async function loadDashboard() {
     document.getElementById('stat-total-devices').textContent = data.total_devices;
     document.getElementById('stat-current-rate').textContent = data.current_traffic_human;
     document.getElementById('stat-today-data').textContent = data.total_data_today_human;
+
+    // SNMP Live WAN Telemetry (ppp0)
+    const snmpInfo = (snmpData && snmpData.status) ? snmpData.status : data.snmp;
+    if (snmpInfo) {
+      const snmpDownEl = document.getElementById('stat-snmp-down');
+      const snmpUpEl = document.getElementById('stat-snmp-up');
+      if (snmpDownEl) snmpDownEl.textContent = snmpInfo.download_human || '0.0 Kbps';
+      if (snmpUpEl) snmpUpEl.textContent = snmpInfo.upload_human || '0.0 Kbps';
+    }
     
     const healthStatusEl = document.getElementById('stat-health-status');
     if (healthStatusEl) {
@@ -164,7 +186,8 @@ async function loadDashboard() {
     }
 
     lastSparklineData = data.traffic_sparkline;
-    renderDashboardSparkline(data.traffic_sparkline);
+    const snmpPoints = (snmpData && snmpData.sparkline && snmpData.sparkline.length > 0) ? snmpData.sparkline : null;
+    renderDashboardSparkline(data.traffic_sparkline, snmpPoints);
 
     // Filter pills update
     const activeList = devices.filter(d => d.is_active);
@@ -592,20 +615,109 @@ function getCategoryIconSvg(cat) {
   }
 }
 
-function renderDashboardSparkline(points) {
+function renderDashboardSparkline(points, snmpPoints) {
   const ctx = document.getElementById('dashboardTrafficChart');
   if (!ctx) return;
 
-  const labels = points.map(p => new Date(p.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  const values = points.map(p => p.bytes);
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  if (charts.dashboardTraffic) {
+  // 1. Dual-line SNMP High-Speed Real-time Series (Download vs Upload)
+  if (snmpPoints && snmpPoints.length > 0) {
+    const labels = snmpPoints.map(p => new Date(p.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    const dlValues = snmpPoints.map(p => p.dl);
+    const ulValues = snmpPoints.map(p => p.ul);
+
+    if (charts.dashboardTraffic && charts.dashboardTraffic.data.datasets.length === 2) {
+      charts.dashboardTraffic.data.labels = labels;
+      charts.dashboardTraffic.data.datasets[0].data = dlValues;
+      charts.dashboardTraffic.data.datasets[1].data = ulValues;
+      charts.dashboardTraffic.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+      charts.dashboardTraffic.update('none');
+      return;
+    }
+
+    if (charts.dashboardTraffic) {
+      charts.dashboardTraffic.destroy();
+    }
+
+    charts.dashboardTraffic = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Download (ppp0)',
+            data: dlValues,
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6, 182, 212, 0.15)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          },
+          {
+            label: 'Upload (ppp0)',
+            data: ulValues,
+            borderColor: '#c084fc',
+            backgroundColor: 'rgba(192, 132, 252, 0.12)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            align: 'end',
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              font: { size: 10 },
+              color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: context => `${context.dataset.label}: ${formatMbps(context.parsed.y)}`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          y: {
+            grid: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' },
+            ticks: { callback: v => formatMbps(v), font: { size: 10 } }
+          }
+        }
+      }
+    });
+    return;
+  }
+
+  // 2. Fallback to client aggregate sparkline
+  if (!points || points.length === 0) return;
+  const labels = points.map(p => new Date(p.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const values = points.map(p => p.bytes);
+
+  if (charts.dashboardTraffic && charts.dashboardTraffic.data.datasets.length === 1) {
     charts.dashboardTraffic.data.labels = labels;
     charts.dashboardTraffic.data.datasets[0].data = values;
     charts.dashboardTraffic.options.scales.y.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
     charts.dashboardTraffic.update();
     return;
+  }
+
+  if (charts.dashboardTraffic) {
+    charts.dashboardTraffic.destroy();
   }
 
   charts.dashboardTraffic = new Chart(ctx, {
@@ -644,6 +756,28 @@ function renderDashboardSparkline(points) {
       }
     }
   });
+}
+
+// High-frequency live SNMP poller (2.5s) for smooth speedometer & dual charts
+async function pollSnmpLive() {
+  if (currentView !== 'dashboard') return;
+  try {
+    const res = await fetch('/api/snmp/live');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data) return;
+
+    if (data.status) {
+      const snmpDownEl = document.getElementById('stat-snmp-down');
+      const snmpUpEl = document.getElementById('stat-snmp-up');
+      if (snmpDownEl) snmpDownEl.textContent = data.status.download_human || '0.0 Kbps';
+      if (snmpUpEl) snmpUpEl.textContent = data.status.upload_human || '0.0 Kbps';
+    }
+
+    if (data.sparkline && data.sparkline.length > 0) {
+      renderDashboardSparkline(null, data.sparkline);
+    }
+  } catch (e) {}
 }
 
 // 2. Devices Inventory
@@ -1163,6 +1297,71 @@ async function loadInternetHealth() {
         </div>
       `).join('');
     }
+
+    // Router Hardware Ports & Interface Matrix via SNMP
+    try {
+      const [snmpLiveRes, snmpIfsRes] = await Promise.all([
+        fetch('/api/snmp/live').catch(() => null),
+        fetch('/api/snmp/interfaces').catch(() => null)
+      ]);
+
+      if (snmpLiveRes && snmpLiveRes.ok) {
+        const liveData = await snmpLiveRes.json();
+        const snmpPill = document.getElementById('snmp-status-pill');
+        const snmpUptime = document.getElementById('snmp-hw-uptime');
+        if (snmpPill) {
+          if (liveData.status && liveData.status.is_connected) {
+            snmpPill.textContent = 'SNMP v2c Connected';
+            snmpPill.className = 'category-badge network';
+            snmpPill.style.color = 'var(--accent-green)';
+          } else {
+            snmpPill.textContent = 'SNMP Disconnected';
+            snmpPill.className = 'category-badge iot';
+            snmpPill.style.color = 'var(--accent-rose)';
+          }
+        }
+        if (snmpUptime && liveData.status) {
+          snmpUptime.textContent = liveData.status.sys_uptime_human || '--';
+        }
+      }
+
+      if (snmpIfsRes && snmpIfsRes.ok) {
+        const interfaces = await snmpIfsRes.json();
+        const tbody = document.getElementById('snmp-interfaces-tbody');
+        if (tbody && Array.isArray(interfaces) && interfaces.length > 0) {
+          const sorted = [...interfaces].sort((a, b) => {
+            if (a.is_hardware && !b.is_hardware) return -1;
+            if (!a.is_hardware && b.is_hardware) return 1;
+            return a.index - b.index;
+          });
+
+          tbody.innerHTML = sorted.map(iface => {
+            const isUp = iface.is_up;
+            const statusBadge = isUp 
+              ? `<span class="category-badge network" style="color: var(--accent-green); font-size: 0.75rem; padding: 2px 8px;">UP</span>`
+              : `<span class="category-badge iot" style="color: var(--text-muted); font-size: 0.75rem; padding: 2px 8px;">DOWN</span>`;
+            const errClass = (iface.in_errors > 0 || iface.out_errors > 0) ? 'color: var(--accent-rose); font-weight: 600;' : 'color: var(--text-muted);';
+            const discClass = (iface.in_discards > 0 || iface.out_discards > 0) ? 'color: var(--accent-amber); font-weight: 600;' : 'color: var(--text-muted);';
+
+            return `
+              <tr>
+                <td style="font-weight: 600; font-family: monospace; color: var(--accent-cyan);">${escapeHtml(iface.name)}</td>
+                <td>
+                  <div>${escapeHtml(iface.role)}</div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">Index #${iface.index}</div>
+                </td>
+                <td>${statusBadge}</td>
+                <td style="font-family: monospace; font-size: 0.78rem;">${iface.mac || '—'}</td>
+                <td style="${errClass}">${iface.in_errors} / ${iface.out_errors}</td>
+                <td style="${discClass}">${iface.in_discards} / ${iface.out_discards}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    } catch (snmpErr) {
+      console.warn("SNMP health data fetch error:", snmpErr);
+    }
   } catch (e) {
     console.error("Health error:", e);
   }
@@ -1256,6 +1455,13 @@ async function loadSettings() {
     document.getElementById('setting-router-url').value = s.router_url || 'http://192.168.0.1';
     document.getElementById('setting-router-user').value = s.router_user || 'user';
     document.getElementById('setting-poll-interval').value = s.poll_interval || 5;
+
+    const snmpEnabledEl = document.getElementById('setting-snmp-enabled');
+    if (snmpEnabledEl) snmpEnabledEl.checked = s.snmp_enabled !== false;
+    const snmpCommunityEl = document.getElementById('setting-snmp-community');
+    if (snmpCommunityEl) snmpCommunityEl.value = s.snmp_community || 'sumitsakpal0183';
+    const snmpPortEl = document.getElementById('setting-snmp-port');
+    if (snmpPortEl) snmpPortEl.value = s.snmp_port || 161;
 
     const pwdStatus = document.getElementById('pwd-status-text');
     if (s.has_password) {
@@ -1641,10 +1847,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const router_user = document.getElementById('setting-router-user').value;
     const router_password = document.getElementById('setting-router-password').value;
     const poll_interval = parseInt(document.getElementById('setting-poll-interval').value);
+    const snmp_enabled = document.getElementById('setting-snmp-enabled')?.checked ?? true;
+    const snmp_community = document.getElementById('setting-snmp-community')?.value?.trim();
+    const snmp_port = parseInt(document.getElementById('setting-snmp-port')?.value || '161');
 
-    const body = { router_url, router_user, poll_interval };
+    const body = { router_url, router_user, poll_interval, snmp_enabled, snmp_port };
     if (isp_name) body.isp_name = isp_name;
     if (router_password) body.router_password = router_password;
+    if (snmp_community) body.snmp_community = snmp_community;
 
     const res = await fetch('/api/settings', {
       method: 'POST',
@@ -1662,6 +1872,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
   pollStatus();
 
+  // Background polling intervals
+  setInterval(pollSnmpLive, 2500);
   setInterval(pollStatus, 3000);
   setInterval(() => {
     if (currentView === 'dashboard') loadDashboard();

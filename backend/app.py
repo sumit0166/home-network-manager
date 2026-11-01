@@ -9,6 +9,7 @@ import time
 from .config import STATIC_DIR, DEFAULT_ROUTER_URL, DEFAULT_ROUTER_USER, DEFAULT_POLL_INTERVAL
 from .database import init_db, get_connection, get_setting, set_setting, log_event
 from .collector import collector_instance
+from .snmp import snmp_poller_instance
 from .analytics import (
     get_network_overview,
     get_devices_summary,
@@ -31,6 +32,9 @@ class SettingsUpdateRequest(BaseModel):
     router_password: Optional[str] = None
     poll_interval: Optional[int] = None
     isp_name: Optional[str] = None
+    snmp_enabled: Optional[bool] = None
+    snmp_community: Optional[str] = None
+    snmp_port: Optional[int] = None
 
 @app.on_event("startup")
 def startup():
@@ -43,13 +47,21 @@ def startup():
     if not get_setting("poll_interval"):
         set_setting("poll_interval", str(DEFAULT_POLL_INTERVAL))
     if not get_setting("isp_name"):
-        set_setting("isp_name", "Local ISP")
+        set_setting("isp_name", "Hathway")
+    if not get_setting("snmp_enabled"):
+        set_setting("snmp_enabled", "1")
+    if not get_setting("snmp_community"):
+        set_setting("snmp_community", "sumitsakpal0183")
+    if not get_setting("snmp_port"):
+        set_setting("snmp_port", "161")
         
     collector_instance.start()
+    snmp_poller_instance.start()
 
 @app.on_event("shutdown")
 def shutdown():
     collector_instance.stop()
+    snmp_poller_instance.stop()
 
 # --- REST APIs ---
 
@@ -65,7 +77,8 @@ def get_system_status():
         "current_down_bps": collector_instance.status["current_down_speed_bps"],
         "last_poll_time": collector_instance.last_poll_time,
         "password_configured": bool(get_setting("router_password")),
-        "wan_info": collector_instance.status.get("wan_info", {})
+        "wan_info": collector_instance.status.get("wan_info", {}),
+        "snmp": snmp_poller_instance.status
     }
 
 @app.get("/api/overview")
@@ -74,6 +87,7 @@ def overview():
     data["is_rebooting"] = collector_instance.status.get("is_rebooting", False)
     data["router_connected"] = collector_instance.status["router_connected"]
     data["wan_info"] = collector_instance.status.get("wan_info", {})
+    data["snmp"] = snmp_poller_instance.status
     return data
 
 @app.get("/api/devices")
@@ -187,6 +201,35 @@ def list_events(limit: int = 50):
 def reports():
     return get_reports_and_insights()
 
+# --- SNMP Hybrid Subsystem Endpoints ---
+
+@app.get("/api/snmp/live")
+def get_snmp_live():
+    return {
+        "status": snmp_poller_instance.status,
+        "sparkline": list(snmp_poller_instance.recent_points)
+    }
+
+@app.get("/api/snmp/interfaces")
+async def get_snmp_interfaces():
+    if snmp_poller_instance.cached_interfaces:
+        return snmp_poller_instance.cached_interfaces
+    if snmp_poller_instance.client:
+        ifs = await snmp_poller_instance.client.get_interfaces_table()
+        snmp_poller_instance.cached_interfaces = ifs
+        return ifs
+    return []
+
+@app.get("/api/snmp/system")
+async def get_snmp_system():
+    if snmp_poller_instance.cached_system:
+        return snmp_poller_instance.cached_system
+    if snmp_poller_instance.client:
+        sysinfo = await snmp_poller_instance.client.get_system_info()
+        snmp_poller_instance.cached_system = sysinfo
+        return sysinfo
+    return {}
+
 @app.get("/api/settings")
 def get_settings():
     return {
@@ -194,7 +237,10 @@ def get_settings():
         "router_user": get_setting("router_user", DEFAULT_ROUTER_USER),
         "poll_interval": int(get_setting("poll_interval", str(DEFAULT_POLL_INTERVAL))),
         "has_password": bool(get_setting("router_password")),
-        "isp_name": get_setting("isp_name", "Local ISP")
+        "isp_name": get_setting("isp_name", "Hathway"),
+        "snmp_enabled": get_setting("snmp_enabled", "1") != "0",
+        "snmp_community": get_setting("snmp_community", "sumitsakpal0183"),
+        "snmp_port": int(get_setting("snmp_port", "161"))
     }
 
 @app.post("/api/settings")
@@ -212,7 +258,18 @@ def update_settings(payload: SettingsUpdateRequest):
         set_setting("poll_interval", str(payload.poll_interval))
         collector_instance.poll_interval = payload.poll_interval
     if payload.isp_name is not None:
-        set_setting("isp_name", payload.isp_name.strip() or "Local ISP")
+        set_setting("isp_name", payload.isp_name.strip() or "Hathway")
+    if payload.snmp_enabled is not None:
+        set_setting("snmp_enabled", "1" if payload.snmp_enabled else "0")
+    if payload.snmp_community is not None:
+        set_setting("snmp_community", payload.snmp_community.strip())
+        if snmp_poller_instance.client:
+            snmp_poller_instance.client.community = payload.snmp_community.strip()
+            snmp_poller_instance.client.auth = CommunityData(payload.snmp_community.strip(), mpModel=1)
+    if payload.snmp_port is not None:
+        set_setting("snmp_port", str(payload.snmp_port))
+        if snmp_poller_instance.client:
+            snmp_poller_instance.client.port = payload.snmp_port
 
     return {"status": "success"}
 
