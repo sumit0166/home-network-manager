@@ -6,7 +6,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Chart.js](https://img.shields.io/badge/Chart.js-Telemetry-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
+<!-- ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge) -->
 
 **Transform a basic home router into a fully observable, enterprise-grade personal network operations dashboard.**
 

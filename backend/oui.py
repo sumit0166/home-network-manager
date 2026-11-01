@@ -62,11 +62,11 @@ def guess_category_from_hostname(name: str) -> str:
     n = name.lower()
     if any(k in n for k in ["tv", "mitv", "firetv", "chromecast", "roku", "appletv", "shield", "smarttv", "bravia", "oled"]):
         return "tv"
-    if any(k in n for k in ["moto", "motorola", "oneplus", "iphone", "galaxy", "redmi", "pixel", "phone", "android", "mobile", "samsung", "oppo", "vivo", "realme", "xiaomi"]):
+    if any(k in n for k in ["moto", "motorola", "oneplus", "iphone", "galaxy", "redmi", "pixel", "phone", "android", "mobile", "samsung", "oppo", "vivo", "realme", "xiaomi", "s24", "g35", "nord", "v24", "v25"]):
         return "mobile"
     if any(k in n for k in ["lt", "laptop", "macbook", "thinkpad", "zenbook", "yoga", "notebook", "dell", "hp-"]):
         return "laptop"
-    if any(k in n for k in ["pc", "desktop", "imac", "mac-mini", "tower", "workstation", "station"]):
+    if any(k in n for k in ["desk", "pc", "desktop", "imac", "mac-mini", "tower", "workstation", "station"]):
         return "desktop"
     if any(k in n for k in ["esp", "tuya", "sonoff", "shelly", "smart", "echo", "nest", "plug", "bulb", "cam", "camera", "printer"]):
         return "iot"

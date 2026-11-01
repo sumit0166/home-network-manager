@@ -96,11 +96,37 @@ function timeAgo(unixTimestamp) {
 
 // 1. Dashboard View
 let lastSparklineData = [];
+let latestOverviewData = null;
+let currentTopoFilter = 'all';
+
+function setTopoFilter(filter) {
+  currentTopoFilter = filter;
+  ['all', 'active', 'offline'].forEach(f => {
+    const btn = document.getElementById(`topo-pill-${f}-btn`);
+    if (btn) btn.classList.toggle('active', f === filter);
+  });
+  if (latestOverviewData && allDevicesCache) {
+    renderTopologyMap(latestOverviewData, allDevicesCache);
+  }
+}
+
+function toggleTopoFilter() {
+  if (currentTopoFilter === 'all') setTopoFilter('active');
+  else if (currentTopoFilter === 'active') setTopoFilter('offline');
+  else setTopoFilter('all');
+}
+
 async function loadDashboard() {
   try {
-    const res = await fetch('/api/overview');
-    if (!res.ok) return;
-    const data = await res.json();
+    const [overviewRes, devicesRes] = await Promise.all([
+      fetch('/api/overview'),
+      fetch('/api/devices')
+    ]);
+    if (!overviewRes.ok || !devicesRes.ok) return;
+    const data = await overviewRes.json();
+    const devices = await devicesRes.json();
+    latestOverviewData = data;
+    allDevicesCache = devices;
 
     document.getElementById('stat-active-devices').textContent = data.active_devices;
     document.getElementById('stat-total-devices').textContent = data.total_devices;
@@ -112,7 +138,16 @@ async function loadDashboard() {
       document.getElementById('top-consumer-name').textContent = data.top_consumer.name;
       document.getElementById('top-consumer-ip').textContent = `IP: ${data.top_consumer.ip}`;
       document.getElementById('top-consumer-amount').textContent = data.top_consumer.consumed_human;
-      document.getElementById('view-top-device-btn').onclick = () => openDeviceDetail(data.top_consumer.mac);
+      
+      const topMac = data.top_consumer.mac;
+      document.getElementById('view-top-device-btn').onclick = () => {
+        if (topMac) {
+          openDeviceDetail(topMac);
+        } else {
+          const matched = allDevicesCache.find(d => d.ip === data.top_consumer.ip || d.custom_name === data.top_consumer.name);
+          openDeviceDetail(matched ? matched.mac : null);
+        }
+      };
     } else {
       document.getElementById('top-consumer-name').textContent = "No traffic yet";
       document.getElementById('top-consumer-ip').textContent = "—";
@@ -122,11 +157,20 @@ async function loadDashboard() {
     lastSparklineData = data.traffic_sparkline;
     renderDashboardSparkline(data.traffic_sparkline);
 
-    // Render Visual Network Topology Map
+    // Filter pills update
+    const activeList = devices.filter(d => d.is_active);
+    const offlineList = devices.filter(d => !d.is_active);
+    const pillAll = document.getElementById('topo-pill-all');
+    const pillActive = document.getElementById('topo-pill-active');
+    const pillOffline = document.getElementById('topo-pill-offline');
+    if (pillAll) pillAll.textContent = devices.length;
+    if (pillActive) pillActive.textContent = activeList.length;
+    if (pillOffline) pillOffline.textContent = offlineList.length;
+
+    // Render Visual Radial Topology Map
     renderTopologyMap(data, devices);
 
     // Active Devices Table
-    const activeList = devices.filter(d => d.is_active);
     const tbody = document.getElementById('dashboard-active-tbody');
     if (activeList.length === 0) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No active clients detected. Ensure router polling is connected in Settings.</td></tr>`;
@@ -138,7 +182,10 @@ async function loadDashboard() {
           <td class="mono-cell">${d.mac}</td>
           <td><span class="category-badge ${d.category}">${d.category}</span></td>
           <td class="mono-cell" style="color: var(--accent-cyan); font-weight: 600;">${d.current_speed_human}</td>
-          <td class="mono-cell">${d.total_bytes_human}</td>
+          <td class="mono-cell">
+            <strong style="color: var(--accent-cyan);">${d.today_bytes_human || d.total_bytes_human}</strong>
+            <span style="font-size: 0.72rem; color: var(--text-muted); display: block;">Total: ${d.total_bytes_human}</span>
+          </td>
           <td>
             <button class="btn btn-secondary" onclick="openDeviceDetail('${d.mac}')" style="padding: 4px 10px; font-size: 0.78rem;">Details</button>
           </td>
@@ -151,90 +198,316 @@ async function loadDashboard() {
 }
 
 function renderTopologyMap(overviewData, devices) {
-  // 1. WAN Node
-  const wanLat = document.getElementById('topo-wan-lat');
-  const wanStatus = document.getElementById('topo-wan-status');
-  if (wanLat && wanStatus) {
-    wanLat.textContent = `${overviewData.internet_latency_ms}ms`;
-    wanStatus.textContent = overviewData.is_online ? 'Online' : 'Outage';
-    wanStatus.style.color = overviewData.is_online ? 'var(--accent-green)' : 'var(--accent-rose)';
+  const svg = document.getElementById('topology-svg');
+  if (!svg) return;
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+  // Filter devices according to current filter
+  let displayDevices = [];
+  if (currentTopoFilter === 'active') {
+    displayDevices = devices.filter(d => d.is_active);
+  } else if (currentTopoFilter === 'offline') {
+    displayDevices = devices.filter(d => !d.is_active);
+  } else {
+    // All: show active first, then offline
+    const active = devices.filter(d => d.is_active);
+    const offline = devices.filter(d => !d.is_active);
+    displayDevices = [...active, ...offline];
   }
 
-  // 2. Router Node
-  const rActive = document.getElementById('topo-active-count');
-  const rRate = document.getElementById('topo-rate-val');
-  if (rActive && rRate) {
-    rActive.textContent = overviewData.active_devices;
-    rRate.textContent = overviewData.current_traffic_human;
-  }
+  // Pre-defined radial positions matching the user's uploaded snapshot:
+  // Slot 0: Top-Left (Royal Blue card with active wire & moving light pulse, e.g. PC Pixelz 1)
+  // Slot 1: Bottom-Left (e.g. Smartphone 3)
+  // Slot 2: Bottom-Center-Left (e.g. Laptop Pixelz 2)
+  // Slot 3: Bottom-Center-Right (e.g. Laptop Pixelz 2)
+  // Slot 4: Bottom-Right (e.g. PC Pixelz 2 / TV)
+  // Slot 5: Top-Right (e.g. PC Pixelz 2)
+  // Slot 6: Mid-Left
+  // Slot 7: Mid-Right
+  const slots = [
+    { x: 65,  y: 135, w: 200, h: 62, portX: 265, portY: 166, rPortX: 375, rPortY: 220, cp1: [320, 166], cp2: [335, 220] },
+    { x: 125, y: 325, w: 195, h: 62, portX: 320, portY: 345, rPortX: 385, rPortY: 260, cp1: [355, 345], cp2: [365, 260] },
+    { x: 350, y: 410, w: 195, h: 62, portX: 445, portY: 410, rPortX: 450, rPortY: 270, cp1: [445, 345], cp2: [450, 310] },
+    { x: 580, y: 410, w: 195, h: 62, portX: 605, portY: 410, rPortX: 510, rPortY: 270, cp1: [605, 345], cp2: [510, 310] },
+    { x: 745, y: 325, w: 195, h: 62, portX: 745, portY: 345, rPortX: 575, rPortY: 260, cp1: [685, 345], cp2: [620, 260] },
+    { x: 695, y: 145, w: 195, h: 62, portX: 695, portY: 176, rPortX: 585, rPortY: 220, cp1: [635, 176], cp2: [625, 220] },
+    { x: 50,  y: 235, w: 195, h: 62, portX: 245, portY: 266, rPortX: 375, rPortY: 240, cp1: [305, 266], cp2: [335, 240] },
+    { x: 755, y: 230, w: 195, h: 62, portX: 755, portY: 261, rPortX: 585, rPortY: 240, cp1: [695, 261], cp2: [640, 240] }
+  ];
 
-  // 3. Device Grids (Active vs Offline)
-  const activeDevices = devices.filter(d => d.is_active);
-  const offlineDevices = devices.filter(d => !d.is_active);
+  const maxDevices = Math.min(displayDevices.length, slots.length);
 
-  const activeNum = document.getElementById('topo-active-num');
-  const offlineNum = document.getElementById('topo-offline-num');
-  if (activeNum) activeNum.textContent = activeDevices.length;
-  if (offlineNum) offlineNum.textContent = offlineDevices.length;
+  // Theme-adaptive palette
+  const bgColor = isDark ? '#101116' : '#f8fafc';
+  const gridDotColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+  const wanLineColor = isDark ? '#333948' : '#cbd5e1';
+  const ispCardFill = isDark ? '#151720' : '#ffffff';
+  const ispCardStroke = isDark ? '#282e3f' : '#e2e8f0';
+  const ispTextMain = isDark ? '#f8fafc' : '#0f172a';
+  const ispTextSub = isDark ? '#94a3b8' : '#64748b';
+  const ispIconBox = isDark ? '#1f2434' : '#f1f5f9';
+  const ispIconStroke = isDark ? '#cbd5e1' : '#475569';
 
-  const activeGrid = document.getElementById('topo-active-grid');
-  if (activeGrid) {
-    if (activeDevices.length === 0) {
-      activeGrid.innerHTML = `<p style="grid-column: 1 / -1; color: var(--text-muted); font-size: 0.8rem;">No active clients connected right now.</p>`;
+  const routerFill = isDark ? '#13151e' : '#ffffff';
+  const routerTextMain = isDark ? '#ffffff' : '#0f172a';
+  const routerTextSub = isDark ? '#93c5fd' : '#2563eb';
+  const routerIconBox = isDark ? '#1c2132' : '#eff6ff';
+  const routerIconStroke = isDark ? '#ffffff' : '#2563eb';
+
+  const defaultActiveWire = isDark ? '#384052' : '#94a3b8';
+  const offlineWireColor = isDark ? '#232836' : '#cbd5e1';
+
+  const ispName = escapeHtml(overviewData.isp_name || 'Local ISP');
+
+  // Build SVG XML
+  let svgContent = `
+    <defs>
+      <!-- Subtle dot grid pattern (Theme Adaptive) -->
+      <pattern id="topoGridPattern" width="22" height="22" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1.1" fill="${gridDotColor}"/>
+      </pattern>
+      
+      <!-- Glow Filters -->
+      <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3.5" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      
+      <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
+      <filter id="glow-red" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
+      <filter id="laser-pulse" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
+      <!-- Gradients -->
+      <linearGradient id="blueCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1d4ed8"/>
+        <stop offset="100%" stop-color="#2563eb"/>
+      </linearGradient>
+
+      <linearGradient id="activeWireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#3b82f6"/>
+        <stop offset="100%" stop-color="#60a5fa"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Canvas Background with dot grid -->
+    <rect width="960" height="520" rx="14" fill="${bgColor}"/>
+    <rect width="960" height="520" rx="14" fill="url(#topoGridPattern)"/>
+
+    <!-- WAN to Router Vertical Link -->
+    <line x1="480" y1="96" x2="480" y2="206" stroke="${wanLineColor}" stroke-width="2"/>
+    <circle cx="480" cy="104" r="4" fill="#10b981" filter="url(#glow-green)"/>
+    <circle cx="480" cy="198" r="4" fill="#10b981" filter="url(#glow-green)"/>
+  `;
+
+  // Draw Device Connecting Wires first (behind node cards)
+  for (let i = 0; i < maxDevices; i++) {
+    const dev = displayDevices[i];
+    const s = slots[i];
+    const pathD = `M ${s.portX} ${s.portY} C ${s.cp1[0]} ${s.cp1[1]}, ${s.cp2[0]} ${s.cp2[1]}, ${s.rPortX} ${s.rPortY}`;
+
+    const isPrimaryHighlight = (i === 0 && dev.is_active);
+
+    if (isPrimaryHighlight) {
+      // Primary Active Glowing Cable (Royal Blue with laser pulse)
+      svgContent += `
+        <path d="${pathD}" fill="none" stroke="#2563eb" stroke-width="3" filter="url(#glow-blue)"/>
+        <circle cx="${s.rPortX}" cy="${s.rPortY}" r="4.5" fill="#10b981" filter="url(#glow-green)"/>
+        <circle cx="${s.portX}" cy="${s.portY}" r="4.5" fill="#10b981" filter="url(#glow-green)"/>
+        
+        <!-- Traveling Laser Pulse -->
+        <circle r="4.5" fill="#ffffff" filter="url(#laser-pulse)">
+          <animateMotion path="${pathD}" dur="2.0s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1"/>
+        </circle>
+      `;
+    } else if (dev.is_active) {
+      // All other active devices also get animated traffic pulses / light beads
+      const animDur = (2.2 + (i * 0.35)).toFixed(1);
+      svgContent += `
+        <path d="${pathD}" fill="none" stroke="${defaultActiveWire}" stroke-width="2.2" class="topo-wire"/>
+        <circle cx="${s.rPortX}" cy="${s.rPortY}" r="4" fill="#10b981" filter="url(#glow-green)"/>
+        <circle cx="${s.portX}" cy="${s.portY}" r="4" fill="#10b981" filter="url(#glow-green)"/>
+        
+        <!-- Animated Active Data Pulse on every active connection -->
+        <circle r="3.5" fill="#10b981" filter="url(#glow-green)">
+          <animateMotion path="${pathD}" dur="${animDur}s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1"/>
+        </circle>
+      `;
     } else {
-      activeGrid.innerHTML = activeDevices.map(d => `
-        <div class="topology-device-card active" onclick="openDeviceDetail('${d.mac}')">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="device-avatar" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">
-              ${getCategoryIconSvg(d.category)}
-            </div>
-            <div>
-              <div style="font-weight: 600; font-size: 0.85rem; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${escapeHtml(d.custom_name)}
-              </div>
-              <div class="mono-cell" style="font-size: 0.72rem; color: var(--text-muted);">${d.ip}</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <span class="status-badge online" style="font-size: 0.68rem; padding: 1px 6px;">
-              <span class="pulse-dot"></span> Active
-            </span>
-            <div class="mono-cell" style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">
-              ${d.current_speed_human}
-            </div>
-          </div>
-        </div>
-      `).join('');
+      // Offline Devices: Dashed wire + RED dots at joins (matches active green dots)
+      svgContent += `
+        <path d="${pathD}" fill="none" stroke="${offlineWireColor}" stroke-width="1.8" stroke-dasharray="5 5" class="topo-wire"/>
+        <circle cx="${s.rPortX}" cy="${s.rPortY}" r="4" fill="#ef4444" filter="url(#glow-red)" class="topo-port-dot offline"/>
+        <circle cx="${s.portX}" cy="${s.portY}" r="4" fill="#ef4444" filter="url(#glow-red)" class="topo-port-dot offline"/>
+      `;
     }
   }
 
-  const offlineGrid = document.getElementById('topo-offline-grid');
-  if (offlineGrid) {
-    if (offlineDevices.length === 0) {
-      offlineGrid.innerHTML = `<p style="grid-column: 1 / -1; color: var(--text-muted); font-size: 0.8rem;">No offline devices registered.</p>`;
+  // Draw Top Node: Configurable ISP / Internet WAN (Local ISP / Internet Service Provider)
+  svgContent += `
+    <g class="topo-node" onclick="switchView('health')" style="cursor: pointer;">
+      <rect x="370" y="42" width="220" height="54" rx="14" fill="${ispCardFill}" stroke="${ispCardStroke}" stroke-width="1.5"/>
+      <!-- Inner Icon Box -->
+      <rect x="382" y="49" width="40" height="40" rx="10" fill="${ispIconBox}"/>
+      <!-- Modem / ISP Icon -->
+      <g transform="translate(390, 57)" stroke="${ispIconStroke}" stroke-width="1.8" fill="none">
+        <rect x="1" y="7" width="22" height="9" rx="2"/>
+        <line x1="5" y1="1" x2="5" y2="7"/>
+        <line x1="19" y1="1" x2="19" y2="7"/>
+        <circle cx="6" cy="11.5" r="1" fill="#10b981"/>
+        <circle cx="11" cy="11.5" r="1" fill="#10b981"/>
+      </g>
+      <!-- Labels -->
+      <text x="432" y="66" fill="${ispTextMain}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">${ispName}</text>
+      <text x="432" y="82" fill="${ispTextSub}" font-size="11" font-family="system-ui, sans-serif">Internet Service Provider</text>
+    </g>
+  `;
+
+  // Draw Center Node: TP-Link Router 1 (with royal blue glowing border)
+  svgContent += `
+    <g class="topo-node" onclick="switchView('settings')" style="cursor: pointer;">
+      <rect x="365" y="206" width="230" height="64" rx="14" fill="${routerFill}" stroke="#2563eb" stroke-width="2" filter="url(#glow-blue)"/>
+      <!-- Inner Icon Box -->
+      <rect x="377" y="218" width="40" height="40" rx="10" fill="${routerIconBox}"/>
+      <!-- Router / Screen Icon -->
+      <g transform="translate(385, 226)" stroke="${routerIconStroke}" stroke-width="1.8" fill="none">
+        <rect x="2" y="2" width="20" height="14" rx="2"/>
+        <line x1="8" y1="20" x2="16" y2="20"/>
+        <line x1="12" y1="16" x2="12" y2="20"/>
+      </g>
+      <!-- Labels -->
+      <text x="428" y="233" fill="${routerTextMain}" font-size="13.5" font-weight="700" font-family="system-ui, sans-serif">TP-Link Router 1</text>
+      <text x="428" y="252" fill="${routerTextSub}" font-size="11.5" font-family="system-ui, sans-serif">192.168.0.1 (Gateway)</text>
+    </g>
+  `;
+
+  // Draw Device Cards
+  for (let i = 0; i < maxDevices; i++) {
+    const dev = displayDevices[i];
+    const s = slots[i];
+    const isPrimaryHighlight = (i === 0 && dev.is_active);
+
+    const safeName = escapeHtml(dev.custom_name || dev.hostname || "Device");
+    const ipLabel = dev.ip ? `${dev.ip}/ 24` : '192.168.0.x';
+    const iconSvgPaths = getSvgDeviceIcon(dev.category);
+
+    if (isPrimaryHighlight) {
+      // Royal Blue Primary Node (Matches PC Pixelz 1)
+      svgContent += `
+        <g class="topo-node topo-node-primary" onclick="openDeviceDetail('${dev.mac}')" style="cursor: pointer;">
+          <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="14" fill="url(#blueCardGrad)" filter="url(#glow-blue)"/>
+          
+          <!-- Inner Icon Box -->
+          <rect x="${s.x + 12}" y="${s.y + 11}" width="40" height="40" rx="10" fill="rgba(255, 255, 255, 0.22)"/>
+          
+          <!-- Icon -->
+          <g transform="translate(${s.x + 20}, ${s.y + 19})" stroke="#ffffff" stroke-width="1.8" fill="none">
+            ${iconSvgPaths}
+          </g>
+          
+          <!-- Floating notification envelope / activity badge -->
+          <g transform="translate(${s.x - 6}, ${s.y + 36})">
+            <rect x="0" y="0" width="22" height="15" rx="3" fill="#eab308" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.4))"/>
+            <path d="M 2 3 L 11 9 L 20 3" stroke="#713f12" stroke-width="1.3" fill="none"/>
+          </g>
+
+          <!-- Device Name and IP -->
+          <text x="${s.x + 60}" y="${s.y + 27}" fill="#ffffff" font-size="13" font-weight="700" font-family="system-ui, sans-serif">
+            ${truncateText(safeName, 15)}
+          </text>
+          <text x="${s.x + 60}" y="${s.y + 45}" fill="#dbeafe" font-size="11" font-family="system-ui, sans-serif">
+            ${ipLabel}
+          </text>
+        </g>
+      `;
     } else {
-      offlineGrid.innerHTML = offlineDevices.map(d => `
-        <div class="topology-device-card offline" onclick="openDeviceDetail('${d.mac}')">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="device-avatar" style="background: rgba(148, 163, 184, 0.12); color: var(--text-muted);">
-              ${getCategoryIconSvg(d.category)}
-            </div>
-            <div>
-              <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-secondary); max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${escapeHtml(d.custom_name)}
-              </div>
-              <div class="mono-cell" style="font-size: 0.72rem; color: var(--text-muted);">${d.ip}</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <span class="status-badge offline" style="font-size: 0.68rem; padding: 1px 6px;">Offline</span>
-            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
-              ${timeAgo(d.last_seen)}
-            </div>
-          </div>
-        </div>
-      `).join('');
+      // Standard Node (Adaptive Light/Dark Theme)
+      const isOnline = dev.is_active;
+      let cardFill, cardStroke, nameFill, subFill, iconStroke, iconBoxFill, cardOpacity;
+
+      if (isOnline) {
+        cardFill = isDark ? '#151720' : '#ffffff';
+        cardStroke = isDark ? '#2a3040' : '#e2e8f0';
+        nameFill = isDark ? '#f1f5f9' : '#0f172a';
+        subFill = isDark ? '#94a3b8' : '#64748b';
+        iconStroke = isDark ? '#cbd5e1' : '#475569';
+        iconBoxFill = isDark ? '#1d2232' : '#f1f5f9';
+        cardOpacity = '1';
+      } else {
+        cardFill = isDark ? '#12141a' : '#f1f5f9';
+        cardStroke = isDark ? '#202430' : '#e2e8f0';
+        nameFill = isDark ? '#94a3b8' : '#64748b';
+        subFill = isDark ? '#64748b' : '#94a3b8';
+        iconStroke = isDark ? '#64748b' : '#94a3b8';
+        iconBoxFill = isDark ? '#181b24' : '#e2e8f0';
+        cardOpacity = '0.7';
+      }
+
+      svgContent += `
+        <g class="topo-node" onclick="openDeviceDetail('${dev.mac}')" style="cursor: pointer; opacity: ${cardOpacity};">
+          <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="14" fill="${cardFill}" stroke="${cardStroke}" stroke-width="1.5"/>
+          
+          <!-- Inner Icon Box -->
+          <rect x="${s.x + 12}" y="${s.y + 11}" width="40" height="40" rx="10" fill="${iconBoxFill}"/>
+          
+          <!-- Icon -->
+          <g transform="translate(${s.x + 20}, ${s.y + 19})" stroke="${iconStroke}" stroke-width="1.8" fill="none">
+            ${iconSvgPaths}
+          </g>
+
+          <!-- Device Name and IP -->
+          <text x="${s.x + 60}" y="${s.y + 27}" fill="${nameFill}" font-size="12.5" font-weight="600" font-family="system-ui, sans-serif">
+            ${truncateText(safeName, 15)}
+          </text>
+          <text x="${s.x + 60}" y="${s.y + 45}" fill="${subFill}" font-size="11" font-family="system-ui, sans-serif">
+            ${ipLabel}
+          </text>
+        </g>
+      `;
     }
+  }
+
+  svg.innerHTML = svgContent;
+}
+
+function truncateText(str, max) {
+  if (!str) return '';
+  return str.length > max ? str.substring(0, max - 1) + '…' : str;
+}
+
+function getSvgDeviceIcon(cat) {
+  if (cat === 'mobile') {
+    return `<rect x="5" y="1" width="14" height="22" rx="2.5"/><circle cx="12" cy="18" r="1" fill="currentColor"/>`;
+  } else if (cat === 'laptop') {
+    return `<rect x="4" y="3" width="16" height="12" rx="1.5"/><line x1="2" y1="18" x2="22" y2="18"/><line x1="10" y1="18" x2="14" y2="18"/>`;
+  } else if (cat === 'tv') {
+    return `<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="7" y1="21" x2="17" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>`;
+  } else {
+    // Desktop default
+    return `<rect x="2" y="2" width="20" height="14" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/>`;
   }
 }
 
@@ -367,12 +640,17 @@ function renderFilteredDevices() {
 
 // 3. Device Details Deep Dive
 async function openDeviceDetail(mac) {
-  currentDetailMac = mac;
+  if (mac) {
+    currentDetailMac = mac;
+  }
   switchView('device-detail');
 }
 
 async function loadDeviceDetail(mac) {
-  // If no mac supplied, select first active or available device
+  if (!mac) {
+    mac = currentDetailMac;
+  }
+  // If still no mac supplied, select first active or available device
   if (!mac) {
     if (allDevicesCache.length === 0) {
       try {
@@ -389,6 +667,7 @@ async function loadDeviceDetail(mac) {
       return;
     }
   }
+  currentDetailMac = mac;
 
   // Populate device switcher dropdown
   const selector = document.getElementById('telemetry-device-select');
@@ -398,6 +677,7 @@ async function loadDeviceDetail(mac) {
         ${escapeHtml(d.custom_name)} (${d.ip}) — ${d.is_active ? 'Active' : 'Offline'}
       </option>
     `).join('');
+    selector.value = mac;
     selector.onchange = (e) => {
       currentDetailMac = e.target.value;
       loadDeviceDetail(e.target.value);
@@ -616,6 +896,28 @@ async function loadInternetHealth() {
 
     document.getElementById('health-uptime-val').textContent = `${data.uptime_pct}%`;
 
+    const gwStatusEl = document.getElementById('health-gw-status');
+    if (gwStatusEl) {
+      gwStatusEl.textContent = data.gateway_online ? 'Online' : 'Unreachable';
+      gwStatusEl.style.color = data.gateway_online ? 'var(--accent-green)' : 'var(--accent-rose)';
+    }
+
+    const gwLatEl = document.getElementById('health-gw-lat');
+    if (gwLatEl) {
+      gwLatEl.textContent = data.current_gateway_lat ?? 0;
+    }
+
+    const wanLatEl = document.getElementById('health-wan-lat');
+    if (wanLatEl) {
+      wanLatEl.textContent = `${data.current_internet_lat ?? 0}ms`;
+    }
+
+    const lossEl = document.getElementById('health-packet-loss');
+    if (lossEl) {
+      lossEl.textContent = `${data.current_packet_loss ?? 0}%`;
+      lossEl.style.color = (data.current_packet_loss > 0) ? 'var(--accent-amber)' : 'var(--accent-green)';
+    }
+
     const ctx = document.getElementById('healthLatencyChart');
     if (!ctx) return;
 
@@ -778,6 +1080,8 @@ async function loadSettings() {
     if (!res.ok) return;
     const s = await res.json();
 
+    const ispField = document.getElementById('setting-isp-name');
+    if (ispField) ispField.value = s.isp_name || 'Local ISP';
     document.getElementById('setting-router-url').value = s.router_url || 'http://192.168.0.1';
     document.getElementById('setting-router-user').value = s.router_user || 'user';
     document.getElementById('setting-poll-interval').value = s.poll_interval || 5;
@@ -900,12 +1204,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const isp_name = document.getElementById('setting-isp-name')?.value?.trim();
     const router_url = document.getElementById('setting-router-url').value;
     const router_user = document.getElementById('setting-router-user').value;
     const router_password = document.getElementById('setting-router-password').value;
     const poll_interval = parseInt(document.getElementById('setting-poll-interval').value);
 
     const body = { router_url, router_user, poll_interval };
+    if (isp_name) body.isp_name = isp_name;
     if (router_password) body.router_password = router_password;
 
     const res = await fetch('/api/settings', {

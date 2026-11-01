@@ -144,6 +144,31 @@
 
       <!-- VIEW 1: DASHBOARD -->
       <section id="view-dashboard" class="view-section active">
+
+        <!-- VISUAL NETWORK TOPOLOGY MAP -->
+        <div class="card" style="margin-bottom: 24px; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">Visual Network Topology</h3>
+              <span class="category-badge iot" style="font-size: 0.7rem;">Live Radial Map</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="pill-group" style="margin: 0;">
+                <button class="pill-btn active" id="topo-pill-all-btn" onclick="setTopoFilter('all')">All (<span id="topo-pill-all">0</span>)</button>
+                <button class="pill-btn" id="topo-pill-active-btn" onclick="setTopoFilter('active')">Active (<span id="topo-pill-active">0</span>)</button>
+                <button class="pill-btn" id="topo-pill-offline-btn" onclick="setTopoFilter('offline')">Offline (<span id="topo-pill-offline">0</span>)</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="topology-canvas-container" id="topology-canvas-wrap">
+            <svg id="topology-svg" viewBox="0 0 960 520" preserveAspectRatio="xMidYMid meet" class="topology-svg-element">
+              <!-- SVG definitions and elements generated dynamically -->
+            </svg>
+          </div>
+        </div>
+
+
         <!-- Overview Stats Grid -->
         <div class="grid grid-cols-4" style="margin-bottom: 24px;">
           <div class="card stat-card">
@@ -221,61 +246,6 @@
           </div>
         </div>
 
-        <!-- VISUAL NETWORK TOPOLOGY MAP -->
-        <div class="card" style="margin-bottom: 24px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <h3 style="font-size: 1.05rem; font-weight: 600;">Visual Network Topology</h3>
-              <span class="category-badge iot" style="font-size: 0.7rem;">Live Hierarchy</span>
-            </div>
-            <span style="font-size: 0.78rem; color: var(--text-muted);">Internet &rarr; Gateway &rarr; Connected Endpoints</span>
-          </div>
-
-          <div class="topology-tree">
-            <!-- Node 1: Internet WAN -->
-            <div class="topology-node-card internet">
-              <div class="device-avatar" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
-              </div>
-              <div>
-                <div style="font-weight: 600; font-size: 0.9rem;">Cloud WAN / Internet</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);"><span id="topo-wan-lat">--</span> avg latency • <span id="topo-wan-status" style="color: var(--accent-green);">Online</span></div>
-              </div>
-            </div>
-
-            <div class="topology-connector pulse-flow"></div>
-
-            <!-- Node 2: Gateway Router -->
-            <div class="topology-node-card router">
-              <div class="device-avatar" style="background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan);">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-              </div>
-              <div>
-                <div style="font-weight: 600; font-size: 0.9rem;">TP-Link Gateway (192.168.0.1)</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);"><span id="topo-active-count">0</span> Active Clients • <span id="topo-rate-val" style="color: var(--accent-cyan);">0 B/s</span></div>
-              </div>
-            </div>
-
-            <!-- Clients Branches -->
-            <div class="topology-clients-section">
-              <div class="topology-group-title">
-                <span>Active Clients (<span id="topo-active-num">0</span>)</span>
-                <span style="color: var(--accent-green); font-size: 0.75rem;">● Connected</span>
-              </div>
-              <div class="topology-devices-grid" id="topo-active-grid">
-                <!-- Populated dynamically -->
-              </div>
-
-              <div class="topology-group-title" style="margin-top: 18px;">
-                <span>Offline Devices (<span id="topo-offline-num">0</span>)</span>
-                <span style="color: var(--text-muted); font-size: 0.75rem;">○ Disconnected / Sleep</span>
-              </div>
-              <div class="topology-devices-grid" id="topo-offline-grid">
-                <!-- Populated dynamically -->
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Quick Active Devices Snapshot Table -->
         <div class="card">
@@ -292,7 +262,7 @@
                   <th>MAC Address</th>
                   <th>Category</th>
                   <th>Current Speed</th>
-                  <th>Total Usage</th>
+                  <th>Usage (Today / Lifetime)</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -564,6 +534,11 @@
           <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px;">Configure connection details to communicate with your TP-Link router.</p>
 
           <form id="settings-form">
+            <div class="form-group">
+              <label>Internet Service Provider (ISP Name)</label>
+              <input type="text" id="setting-isp-name" class="form-control" placeholder="Local ISP">
+              <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Displays on the upstream WAN node in the network topology diagram.</span>
+            </div>
             <div class="form-group">
               <label>Router Web Management URL</label>
               <input type="text" id="setting-router-url" class="form-control" placeholder="http://192.168.0.1" required>

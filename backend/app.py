@@ -29,6 +29,7 @@ class SettingsUpdateRequest(BaseModel):
     router_user: Optional[str] = None
     router_password: Optional[str] = None
     poll_interval: Optional[int] = None
+    isp_name: Optional[str] = None
 
 @app.on_event("startup")
 def startup():
@@ -40,6 +41,8 @@ def startup():
         set_setting("router_user", DEFAULT_ROUTER_USER)
     if not get_setting("poll_interval"):
         set_setting("poll_interval", str(DEFAULT_POLL_INTERVAL))
+    if not get_setting("isp_name"):
+        set_setting("isp_name", "Local ISP")
         
     collector_instance.start()
 
@@ -123,7 +126,8 @@ def get_settings():
         "router_url": get_setting("router_url", DEFAULT_ROUTER_URL),
         "router_user": get_setting("router_user", DEFAULT_ROUTER_USER),
         "poll_interval": int(get_setting("poll_interval", str(DEFAULT_POLL_INTERVAL))),
-        "has_password": bool(get_setting("router_password"))
+        "has_password": bool(get_setting("router_password")),
+        "isp_name": get_setting("isp_name", "Local ISP")
     }
 
 @app.post("/api/settings")
@@ -140,6 +144,8 @@ def update_settings(payload: SettingsUpdateRequest):
     if payload.poll_interval and payload.poll_interval >= 3:
         set_setting("poll_interval", str(payload.poll_interval))
         collector_instance.poll_interval = payload.poll_interval
+    if payload.isp_name is not None:
+        set_setting("isp_name", payload.isp_name.strip() or "Local ISP")
 
     return {"status": "success"}
 

@@ -1,6 +1,6 @@
 import time
 from typing import Dict, Any, List, Optional
-from .database import get_connection
+from .database import get_connection, get_setting
 
 def format_bytes_human(b: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -96,18 +96,32 @@ def get_network_overview() -> Dict[str, Any]:
         "internet_latency_ms": health_row["internet_latency_ms"] if health_row else 0.0,
         "gateway_latency_ms": health_row["gateway_latency_ms"] if health_row else 0.0,
         "top_consumer": {
+            "mac": top_consumer["mac"],
             "name": top_consumer["custom_name"],
             "ip": top_consumer["ip"],
             "category": top_consumer["category"],
             "consumed_human": format_bytes_human(top_consumer["consumed"])
         } if top_consumer and top_consumer["consumed"] > 0 else None,
+        "isp_name": get_setting("isp_name", "Local ISP"),
         "traffic_sparkline": timeline_points
     }
 
 def get_devices_summary() -> List[Dict[str, Any]]:
+    now = int(time.time())
+    today_start = now - (now % 86400)
     conn = get_connection()
     devices = conn.execute("SELECT * FROM devices ORDER BY is_active DESC, last_seen DESC").fetchall()
     
+    # Pre-aggregate today's consumption per device (delta since midnight)
+    today_rows = conn.execute("""
+        SELECT device_mac,
+               MAX(COALESCE(MAX(total_bytes) - MIN(total_bytes), 0), COALESCE(SUM(curr_bytes), 0)) as today_consumed
+        FROM traffic_snapshots
+        WHERE timestamp >= ?
+        GROUP BY device_mac
+    """, (today_start,)).fetchall()
+    today_map = {r["device_mac"]: r["today_consumed"] for r in today_rows}
+
     result = []
     for d in devices:
         stat = conn.execute("""
@@ -116,6 +130,8 @@ def get_devices_summary() -> List[Dict[str, Any]]:
             WHERE device_mac = ? 
             ORDER BY timestamp DESC LIMIT 1
         """, (d["mac"],)).fetchone()
+
+        today_b = today_map.get(d["mac"], 0)
 
         result.append({
             "mac": d["mac"],
@@ -130,6 +146,8 @@ def get_devices_summary() -> List[Dict[str, Any]]:
             "is_active": bool(d["is_active"]),
             "current_speed_bytes": stat["curr_bytes"] if stat else 0,
             "current_speed_human": f"{format_bytes_human(stat['curr_bytes'] if stat else 0)}/s",
+            "today_bytes": today_b,
+            "today_bytes_human": format_bytes_human(today_b),
             "total_bytes": stat["total_bytes"] if stat else 0,
             "total_bytes_human": format_bytes_human(stat["total_bytes"] if stat else 0),
             "notes": d["notes"] or ""
@@ -310,6 +328,12 @@ def get_internet_health_analytics() -> Dict[str, Any]:
         ORDER BY timestamp DESC
     """, (start_time,)).fetchall()
 
+    latest_health = conn.execute("""
+        SELECT is_online, internet_latency_ms, gateway_latency_ms, packet_loss_pct
+        FROM network_health
+        ORDER BY timestamp DESC LIMIT 1
+    """).fetchone()
+
     conn.close()
 
     points = [{
@@ -325,6 +349,10 @@ def get_internet_health_analytics() -> Dict[str, Any]:
 
     return {
         "uptime_pct": uptime_pct,
+        "gateway_online": bool(latest_health and latest_health["gateway_latency_ms"] > 0),
+        "current_gateway_lat": round(latest_health["gateway_latency_ms"], 1) if latest_health else 0.0,
+        "current_internet_lat": round(latest_health["internet_latency_ms"], 1) if latest_health else 0.0,
+        "current_packet_loss": round(latest_health["packet_loss_pct"], 1) if latest_health else 0.0,
         "timeline": points,
         "outages": [dict(o) for o in outages]
     }

@@ -83,6 +83,8 @@ def init_db():
     if "interface" not in cols:
         cursor.execute("ALTER TABLE devices ADD COLUMN interface TEXT;")
 
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('isp_name', 'Local ISP');")
+
     conn.commit()
     conn.close()
 

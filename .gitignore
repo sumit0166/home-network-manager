@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# SQLite WAL and lock files
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Process logs
+nohup.out
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
