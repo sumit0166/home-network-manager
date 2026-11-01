@@ -914,7 +914,7 @@ async function loadDeviceDetail(mac) {
     const sorted = [...allDevicesCache].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0));
     selector.innerHTML = sorted.map(d => `
       <option value="${d.mac}" ${d.mac === mac ? 'selected' : ''}>
-        ${d.is_active ? '🟢 [Online]' : '⚪ [Offline]'} ${escapeHtml(d.custom_name)} (${d.ip})
+        ${d.is_active ? '🟢 [Online]' : '🔴 [Offline]'} ${escapeHtml(d.custom_name)} (${d.ip})
       </option>
     `).join('');
     selector.value = mac;

@@ -754,6 +754,46 @@ tr:hover td {
   border-color: var(--border-focus);
 }
 
+/* Select & Option Dropdown Palette (Dark / Light Mode Support) */
+select.form-control,
+select {
+  color-scheme: dark;
+}
+
+[data-theme="light"] select.form-control,
+[data-theme="light"] select {
+  color-scheme: light;
+}
+
+select option,
+.form-control option {
+  background-color: #121826;
+  color: #f8fafc;
+  padding: 8px 12px;
+}
+
+[data-theme="light"] select option,
+[data-theme="light"] .form-control option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+#telemetry-device-select {
+  color: var(--text-primary);
+  background-color: transparent;
+}
+
+#telemetry-device-select option {
+  background-color: #121826;
+  color: #f8fafc;
+  padding: 8px 12px;
+}
+
+[data-theme="light"] #telemetry-device-select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
 /* Event List */
 .event-timeline {
   display: flex;
