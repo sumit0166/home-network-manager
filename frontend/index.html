@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomePulse — Personal Network Operations Center</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN for animated telemetry charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>HomePulse</h1>
+          <span>Network Ops</span>
+        </div>
+      </div>
+
+      <ul class="nav-menu">
+        <li class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="7" height="9" x="3" y="3" rx="1"/>
+            <rect width="7" height="5" x="14" y="3" rx="1"/>
+            <rect width="7" height="9" x="14" y="12" rx="1"/>
+            <rect width="7" height="5" x="3" y="16" rx="1"/>
+          </svg>
+          Dashboard
+        </li>
+        <li class="nav-item" data-view="devices">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="14" x="2" y="3" rx="2"/>
+            <line x1="8" x2="16" y1="21" y2="21"/>
+            <line x1="12" x2="12" y1="17" y2="21"/>
+          </svg>
+          Devices
+        </li>
+        <li class="nav-item" data-view="device-detail">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20v-6M6 20V10M18 20V4"/>
+          </svg>
+          Device Telemetry
+        </li>
+        <li class="nav-item" data-view="traffic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18"/>
+            <path d="m19 9-5 5-4-4-3 3"/>
+          </svg>
+          Traffic Analytics
+        </li>
+        <li class="nav-item" data-view="health">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          Internet Health
+        </li>
+        <li class="nav-item" data-view="history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Connection History
+        </li>
+        <li class="nav-item" data-view="reports">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" x2="8" y1="13" y2="13"/>
+            <line x1="16" x2="8" y1="17" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          Reports & Insights
+        </li>
+        <li class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          Settings
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="live-status-card">
+          <div class="status-row">
+            <span>Router</span>
+            <span id="sidebar-router-badge" class="status-badge offline">
+              <span class="pulse-dot"></span> <span id="sidebar-router-text">Offline</span>
+            </span>
+          </div>
+          <div class="status-row">
+            <span>Internet</span>
+            <span id="sidebar-internet-badge" class="status-badge offline">
+              <span class="pulse-dot"></span> <span id="sidebar-internet-text">Checking</span>
+            </span>
+          </div>
+        </div>
+
+        <button class="theme-toggle-btn" id="theme-toggle" title="Toggle Light / Dark Mode">
+          <span id="theme-mode-text">Dark Mode</span>
+          <svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Dynamic Content -->
+    <main class="main-content">
+      
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-title">
+          <h2 id="view-title">Dashboard</h2>
+          <p id="view-subtitle">Real-time network observability & device intelligence</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="last-updated-pill" style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">Live Updates Active</span>
+          <button class="btn btn-secondary" id="refresh-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 21h5v-5"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <!-- VIEW 1: DASHBOARD -->
+      <section id="view-dashboard" class="view-section active">
+        <!-- Overview Stats Grid -->
+        <div class="grid grid-cols-4" style="margin-bottom: 24px;">
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Active Devices</div>
+              <div class="stat-value" id="stat-active-devices" style="color: var(--accent-green);">0</div>
+              <div class="stat-sub"><span id="stat-total-devices">0</span> total discovered</div>
+            </div>
+            <div class="stat-icon green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            </div>
+          </div>
+
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Live Network Rate</div>
+              <div class="stat-value" id="stat-current-rate" style="color: var(--accent-cyan);">0 B/s</div>
+              <div class="stat-sub">Instantaneous throughput</div>
+            </div>
+            <div class="stat-icon cyan">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m17 19-5 3-5-3"/></svg>
+            </div>
+          </div>
+
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Today's Consumption</div>
+              <div class="stat-value" id="stat-today-data" style="color: var(--accent-blue);">0 MB</div>
+              <div class="stat-sub">Across all clients</div>
+            </div>
+            <div class="stat-icon blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </div>
+          </div>
+
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Internet Health</div>
+              <div class="stat-value" id="stat-health-status" style="color: var(--accent-purple);">99.8%</div>
+              <div class="stat-sub"><span id="stat-latency-val">0ms</span> avg latency</div>
+            </div>
+            <div class="stat-icon purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Telemetry Chart & Top Consumer Banner -->
+        <div class="grid grid-cols-3" style="margin-bottom: 24px;">
+          <div class="card" style="grid-column: span 2;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">Real-Time Network Activity</h3>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Past 60 Minutes (60s buckets)</span>
+            </div>
+            <div style="height: 240px; position: relative;">
+              <canvas id="dashboardTrafficChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <span class="category-badge laptop" style="font-size: 0.7rem;">Top Consumer Today</span>
+              </div>
+              <h4 id="top-consumer-name" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 4px;">Detecting...</h4>
+              <p id="top-consumer-ip" style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.85rem;">—</p>
+              <div style="margin-top: 20px;">
+                <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Data Consumed Today</div>
+                <div id="top-consumer-amount" style="font-size: 1.8rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent-cyan);">0 MB</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="view-top-device-btn" style="width: 100%; justify-content: center; margin-top: 16px;">
+              View Device Profile
+            </button>
+          </div>
+        </div>
+
+        <!-- VISUAL NETWORK TOPOLOGY MAP -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">Visual Network Topology</h3>
+              <span class="category-badge iot" style="font-size: 0.7rem;">Live Hierarchy</span>
+            </div>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Internet &rarr; Gateway &rarr; Connected Endpoints</span>
+          </div>
+
+          <div class="topology-tree">
+            <!-- Node 1: Internet WAN -->
+            <div class="topology-node-card internet">
+              <div class="device-avatar" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Cloud WAN / Internet</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><span id="topo-wan-lat">--</span> avg latency • <span id="topo-wan-status" style="color: var(--accent-green);">Online</span></div>
+              </div>
+            </div>
+
+            <div class="topology-connector pulse-flow"></div>
+
+            <!-- Node 2: Gateway Router -->
+            <div class="topology-node-card router">
+              <div class="device-avatar" style="background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+              </div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">TP-Link Gateway (192.168.0.1)</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);"><span id="topo-active-count">0</span> Active Clients • <span id="topo-rate-val" style="color: var(--accent-cyan);">0 B/s</span></div>
+              </div>
+            </div>
+
+            <!-- Clients Branches -->
+            <div class="topology-clients-section">
+              <div class="topology-group-title">
+                <span>Active Clients (<span id="topo-active-num">0</span>)</span>
+                <span style="color: var(--accent-green); font-size: 0.75rem;">● Connected</span>
+              </div>
+              <div class="topology-devices-grid" id="topo-active-grid">
+                <!-- Populated dynamically -->
+              </div>
+
+              <div class="topology-group-title" style="margin-top: 18px;">
+                <span>Offline Devices (<span id="topo-offline-num">0</span>)</span>
+                <span style="color: var(--text-muted); font-size: 0.75rem;">○ Disconnected / Sleep</span>
+              </div>
+              <div class="topology-devices-grid" id="topo-offline-grid">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Active Devices Snapshot Table -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="font-size: 1.05rem; font-weight: 600;">Active Network Clients</h3>
+            <button class="btn btn-secondary" onclick="switchView('devices')" style="padding: 5px 12px; font-size: 0.8rem;">View All Inventory &rarr;</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Device Name</th>
+                  <th>IP Address</th>
+                  <th>MAC Address</th>
+                  <th>Category</th>
+                  <th>Current Speed</th>
+                  <th>Total Usage</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-active-tbody">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading active clients...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: DEVICES INVENTORY -->
+      <section id="view-devices" class="view-section">
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="device-search-input" placeholder="Search by name, IP, or MAC...">
+          </div>
+          <div class="pill-group" id="device-category-pills">
+            <button class="pill-btn active" data-cat="all">All</button>
+            <button class="pill-btn" data-cat="mobile">Mobile</button>
+            <button class="pill-btn" data-cat="laptop">Laptops</button>
+            <button class="pill-btn" data-cat="desktop">Desktops</button>
+            <button class="pill-btn" data-cat="tv">TV / Media</button>
+            <button class="pill-btn" data-cat="iot">IoT</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Device Name</th>
+                <th>Category</th>
+                <th>IP Address</th>
+                <th>MAC Address</th>
+                <th>Vendor</th>
+                <th>Current Speed</th>
+                <th>Lifetime Data</th>
+                <th>Last Active</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="devices-inventory-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VIEW 3: DEVICE DETAILS DEEP DIVE -->
+      <section id="view-device-detail" class="view-section">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="switchView('devices')" style="padding: 6px 14px; font-size: 0.82rem;">
+            &larr; Back to Devices
+          </button>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Select Device:</span>
+            <select id="telemetry-device-select" class="form-control" style="width: 280px; padding: 6px 12px; font-size: 0.85rem;">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3" style="margin-bottom: 24px;">
+          <div class="card" style="grid-column: span 2;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h3 id="detail-device-name" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 4px;">Loading Device...</h3>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px;">
+                  <span id="detail-category-badge" class="category-badge unknown">Unknown</span>
+                  <span id="detail-ip-badge" class="mono-cell" style="color: var(--accent-cyan);">IP: --</span>
+                  <span id="detail-mac-badge" class="mono-cell" style="color: var(--text-muted);">MAC: --</span>
+                </div>
+              </div>
+              <button class="btn btn-secondary" id="edit-detail-device-btn">Edit Identity</button>
+            </div>
+
+            <div class="grid grid-cols-3" style="margin-top: 28px;">
+              <div class="stat-card card" style="padding: 16px;">
+                <div class="stat-info">
+                  <div class="stat-label">Today's Data</div>
+                  <div class="stat-value" id="detail-today-data" style="font-size: 1.3rem;">0 B</div>
+                </div>
+              </div>
+              <div class="stat-card card" style="padding: 16px;">
+                <div class="stat-info">
+                  <div class="stat-label">Last 7 Days</div>
+                  <div class="stat-value" id="detail-week-data" style="font-size: 1.3rem;">0 B</div>
+                </div>
+              </div>
+              <div class="stat-card card" style="padding: 16px;">
+                <div class="stat-info">
+                  <div class="stat-label">Last 30 Days</div>
+                  <div class="stat-value" id="detail-month-data" style="font-size: 1.3rem;">0 B</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 16px;">Protocol Breakdown (24h)</h4>
+            <div style="height: 190px; position: relative;">
+              <canvas id="deviceProtocolChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 24px;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Hourly Usage Activity (Past 24 Hours)</h4>
+          <div style="height: 250px; position: relative;">
+            <canvas id="deviceHourlyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Device Event & State Timeline</h4>
+          <div class="event-timeline" id="device-events-timeline">
+            <!-- Event entries -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: TRAFFIC ANALYTICS -->
+      <section id="view-traffic" class="view-section">
+        <div class="filter-bar">
+          <h3 style="font-size: 1.1rem; font-weight: 600;">Network Consumption Trends</h3>
+          <div class="pill-group" id="traffic-period-pills">
+            <button class="pill-btn active" data-hours="1">Last 1 Hour</button>
+            <button class="pill-btn" data-hours="24">Last 24 Hours</button>
+            <button class="pill-btn" data-hours="168">Last 7 Days</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 24px;">
+          <div style="height: 280px; position: relative;">
+            <canvas id="trafficAnalyticsChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Top Bandwidth Consumers (Selected Period)</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Device</th>
+                  <th>Category</th>
+                  <th>IP Address</th>
+                  <th>Total Bandwidth Consumed</th>
+                </tr>
+              </thead>
+              <tbody id="top-consumers-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: INTERNET HEALTH -->
+      <section id="view-health" class="view-section">
+        <div class="grid grid-cols-4" style="margin-bottom: 24px;">
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Gateway Status</div>
+              <div class="stat-value" id="health-gw-status" style="color: var(--accent-green);">Online</div>
+              <div class="stat-sub"><span id="health-gw-lat">0</span>ms latency</div>
+            </div>
+            <div class="stat-icon green"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Internet Availability</div>
+              <div class="stat-value" id="health-uptime-val" style="color: var(--accent-cyan);">100%</div>
+              <div class="stat-sub">Past 24 hours uptime</div>
+            </div>
+            <div class="stat-icon cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6H8l4-6z"/></svg></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">WAN Latency</div>
+              <div class="stat-value" id="health-wan-lat" style="color: var(--accent-blue);">18ms</div>
+              <div class="stat-sub">Cloud DNS ping</div>
+            </div>
+            <div class="stat-icon blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-info">
+              <div class="stat-label">Packet Loss</div>
+              <div class="stat-value" id="health-packet-loss" style="color: var(--accent-green);">0.0%</div>
+              <div class="stat-sub">Zero dropped probes</div>
+            </div>
+            <div class="stat-icon amber"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 24px;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Latency & Connection Telemetry (Past 24 Hours)</h4>
+          <div style="height: 270px; position: relative;">
+            <canvas id="healthLatencyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Internet Outage & Recovery Log</h4>
+          <div class="event-timeline" id="health-outage-timeline">
+            <p style="color: var(--text-muted); font-size: 0.85rem;">No outages recorded in the last 24 hours.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: CONNECTION HISTORY -->
+      <section id="view-history" class="view-section">
+        <div class="card">
+          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 18px;">Network Events & Device History</h3>
+          <div class="event-timeline" id="global-events-timeline">
+            <!-- Events -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: REPORTS & INSIGHTS -->
+      <section id="view-reports" class="view-section">
+        <div class="grid grid-cols-3" style="margin-bottom: 24px;">
+          <div class="card">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Busiest Time Today</div>
+            <div id="rep-busiest-hour" style="font-size: 1.6rem; font-weight: 700; margin-top: 8px; color: var(--accent-amber);">--</div>
+            <p id="rep-busiest-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
+          </div>
+
+          <div class="card">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Top Device Today</div>
+            <div id="rep-top-today" style="font-size: 1.4rem; font-weight: 700; margin-top: 8px; color: var(--accent-cyan);">--</div>
+            <p id="rep-top-today-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
+          </div>
+
+          <div class="card">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Top Device This Month</div>
+            <div id="rep-top-month" style="font-size: 1.4rem; font-weight: 700; margin-top: 8px; color: var(--accent-purple);">--</div>
+            <p id="rep-top-month-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Dormant Devices (Unseen in > 7 Days)</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Device Name</th>
+                  <th>IP Address</th>
+                  <th>MAC Address</th>
+                  <th>Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="dormant-devices-tbody">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">None found.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 8: SETTINGS -->
+      <section id="view-settings" class="view-section">
+        <div class="card" style="max-width: 650px;">
+          <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;">Router Monitoring Preferences</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px;">Configure connection details to communicate with your TP-Link router.</p>
+
+          <form id="settings-form">
+            <div class="form-group">
+              <label>Router Web Management URL</label>
+              <input type="text" id="setting-router-url" class="form-control" placeholder="http://192.168.0.1" required>
+            </div>
+            <div class="form-group">
+              <label>Router Username</label>
+              <input type="text" id="setting-router-user" class="form-control" placeholder="user" required>
+            </div>
+            <div class="form-group">
+              <label>Router Admin Password</label>
+              <input type="password" id="setting-router-password" class="form-control" placeholder="••••••••••••" autocomplete="new-password">
+              <span id="pwd-status-text" style="font-size: 0.75rem; color: var(--accent-green); margin-top: 4px; display: block;"></span>
+            </div>
+            <div class="form-group">
+              <label>Background Polling Interval (Seconds)</label>
+              <input type="number" id="setting-poll-interval" class="form-control" min="3" max="60" value="5" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Save & Restart Collector</button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Device Edit Modal -->
+  <div class="modal-overlay" id="device-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit Device Details</h3>
+        <button class="close-btn" onclick="closeDeviceModal()">&times;</button>
+      </div>
+      <form id="device-edit-form">
+        <input type="hidden" id="edit-mac">
+        <div class="form-group">
+          <label>Custom Name</label>
+          <input type="text" id="edit-custom-name" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="edit-category" class="form-control">
+            <option value="mobile">Mobile Phone</option>
+            <option value="laptop">Laptop</option>
+            <option value="desktop">Desktop PC</option>
+            <option value="tv">Smart TV / Media</option>
+            <option value="iot">Smart Home / IoT</option>
+            <option value="unknown">Other / Unknown</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes / Owner</label>
+          <input type="text" id="edit-notes" class="form-control" placeholder="e.g. Living room, John's phone">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeDeviceModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
