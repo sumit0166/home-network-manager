@@ -12,7 +12,7 @@ venv/
 *.db-journal
 *.db-wal
 *.db-shm
-
+*.db
 # Process logs
 nohup.out
 *.log
