@@ -269,6 +269,9 @@ function renderTopologyMap(overviewData, devices) {
 
   const ispName = escapeHtml(overviewData.isp_name || 'Hathway');
   const isInternetOnline = Boolean(overviewData.is_online);
+  const isRouterRebooting = Boolean(overviewData.is_rebooting);
+  const isRouterConnected = Boolean(overviewData.router_connected ?? true);
+  const isRouterDown = isRouterRebooting || !isRouterConnected;
 
   // Build SVG XML
   let svgContent = `
@@ -287,6 +290,16 @@ function renderTopologyMap(overviewData, devices) {
         </feMerge>
       </filter>
       
+      <filter id="glow-amber" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3.5" result="blur"/>
+        <feFlood flood-color="#f59e0b" flood-opacity="0.6" result="color"/>
+        <feComposite in2="blur" operator="in"/>
+        <feMerge>
+          <feMergeNode/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
       <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
         <feGaussianBlur stdDeviation="2.5" result="blur"/>
         <feMerge>
@@ -327,8 +340,12 @@ function renderTopologyMap(overviewData, devices) {
     <rect width="960" height="520" rx="14" fill="${bgColor}"/>
     <rect width="960" height="520" rx="14" fill="url(#topoGridPattern)"/>
 
-    <!-- WAN to Router Vertical Link (Dynamic: Green when online, Red/Dashed on Outage) -->
-    ${isInternetOnline ? `
+    <!-- WAN to Router Vertical Link (Dynamic: Green when online, Red/Dashed on Outage, Amber on Reboot) -->
+    ${isRouterDown ? `
+      <line x1="480" y1="96" x2="480" y2="206" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <circle cx="480" cy="99" r="4.5" fill="#ef4444" filter="url(#glow-red)"/>
+      <circle cx="480" cy="204" r="4.5" fill="#f59e0b" filter="url(#glow-amber)"/>
+    ` : (isInternetOnline ? `
       <line x1="480" y1="96" x2="480" y2="206" stroke="${wanLineColor}" stroke-width="2"/>
       <circle cx="480" cy="99" r="4" fill="#10b981" filter="url(#glow-green)"/>
       <circle cx="480" cy="204" r="4" fill="#10b981" filter="url(#glow-green)"/>
@@ -336,7 +353,7 @@ function renderTopologyMap(overviewData, devices) {
       <line x1="480" y1="96" x2="480" y2="206" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6 6"/>
       <circle cx="480" cy="99" r="4.5" fill="#ef4444" filter="url(#glow-red)"/>
       <circle cx="480" cy="204" r="4.5" fill="#ef4444" filter="url(#glow-red)"/>
-    `}
+    `)}
   `;
 
   // Draw Device Connecting Wires first (behind node cards)
@@ -345,9 +362,16 @@ function renderTopologyMap(overviewData, devices) {
     const s = slots[i];
     const pathD = `M ${s.portX} ${s.portY} C ${s.cp1[0]} ${s.cp1[1]}, ${s.cp2[0]} ${s.cp2[1]}, ${s.rPortX} ${s.rPortY}`;
 
-    const isPrimaryHighlight = (i === 0 && dev.is_active);
+    const isPrimaryHighlight = (!isRouterDown && i === 0 && dev.is_active);
 
-    if (isPrimaryHighlight) {
+    if (isRouterDown) {
+      // Router rebooting: connection to all devices is lost (dashed offline line + red join dots)
+      svgContent += `
+        <path d="${pathD}" fill="none" stroke="${offlineWireColor}" stroke-width="1.8" stroke-dasharray="5 5" class="topo-wire" opacity="0.6"/>
+        <circle cx="${s.rPortX}" cy="${s.rPortY}" r="4" fill="#ef4444" filter="url(#glow-red)" class="topo-port-dot offline"/>
+        <circle cx="${s.portX}" cy="${s.portY}" r="4" fill="#ef4444" filter="url(#glow-red)" class="topo-port-dot offline"/>
+      `;
+    } else if (isPrimaryHighlight) {
       // Primary Active Glowing Cable (Royal Blue with laser pulse)
       svgContent += `
         <path d="${pathD}" fill="none" stroke="#2563eb" stroke-width="3" filter="url(#glow-blue)"/>
@@ -413,21 +437,35 @@ function renderTopologyMap(overviewData, devices) {
     </g>
   `;
 
-  // Draw Center Node: TP-Link Router 1 (with royal blue glowing border)
+  // Draw Center Node: TP-Link Router 1 (Amber on Reboot / Blue on Normal)
+  const rBorderColor = isRouterDown ? '#f59e0b' : '#2563eb';
+  const rFilter = isRouterDown ? 'filter="url(#glow-amber)"' : 'filter="url(#glow-blue)"';
+  const rIconBoxFill = isRouterDown ? (isDark ? '#2b2108' : '#fef3c7') : routerIconBox;
+  const rIconColor = isRouterDown ? '#f59e0b' : routerIconStroke;
+  const rTitleText = isRouterDown ? 'TP-Link Router 1 (Rebooting)' : 'TP-Link Router 1';
+  const rTitleColor = isRouterDown ? '#f59e0b' : routerTextMain;
+  const rSubText = isRouterDown ? '192.168.0.1 (Diagnostic Reboot)' : '192.168.0.1 (Gateway)';
+  const rSubColor = isRouterDown ? '#fbbf24' : routerTextSub;
+
   svgContent += `
-    <g class="topo-node" onclick="switchView('settings')" style="cursor: pointer;">
-      <rect x="365" y="206" width="230" height="64" rx="14" fill="${routerFill}" stroke="#2563eb" stroke-width="2" filter="url(#glow-blue)"/>
+    <g class="topo-node" onclick="openRouterModal()" style="cursor: pointer;">
+      <title>${isRouterDown ? 'Gateway Router is Rebooting' : 'Click for Router Diagnostics & Reboot'}</title>
+      <rect x="365" y="206" width="230" height="64" rx="14" fill="${routerFill}" stroke="${rBorderColor}" stroke-width="${isRouterDown ? 2.5 : 2}" ${rFilter}/>
       <!-- Inner Icon Box -->
-      <rect x="377" y="218" width="40" height="40" rx="10" fill="${routerIconBox}"/>
+      <rect x="377" y="218" width="40" height="40" rx="10" fill="${rIconBoxFill}"/>
       <!-- Router / Screen Icon -->
-      <g transform="translate(385, 226)" stroke="${routerIconStroke}" stroke-width="1.8" fill="none">
+      <g transform="translate(385, 226)" stroke="${rIconColor}" stroke-width="1.8" fill="none">
         <rect x="2" y="2" width="20" height="14" rx="2"/>
         <line x1="8" y1="20" x2="16" y2="20"/>
         <line x1="12" y1="16" x2="12" y2="20"/>
       </g>
       <!-- Labels -->
-      <text x="428" y="233" fill="${routerTextMain}" font-size="13.5" font-weight="700" font-family="system-ui, sans-serif">TP-Link Router 1</text>
-      <text x="428" y="252" fill="${routerTextSub}" font-size="11.5" font-family="system-ui, sans-serif">192.168.0.1 (Gateway)</text>
+      <text x="428" y="233" fill="${rTitleColor}" font-size="13.5" font-weight="700" font-family="system-ui, sans-serif">
+        ${rTitleText}
+      </text>
+      <text x="428" y="252" fill="${rSubColor}" font-size="11.5" font-weight="${isRouterDown ? 600 : 400}" font-family="system-ui, sans-serif">
+        ${rSubText}
+      </text>
     </g>
   `;
 
@@ -435,7 +473,7 @@ function renderTopologyMap(overviewData, devices) {
   for (let i = 0; i < maxDevices; i++) {
     const dev = displayDevices[i];
     const s = slots[i];
-    const isPrimaryHighlight = (i === 0 && dev.is_active);
+    const isPrimaryHighlight = (!isRouterDown && i === 0 && dev.is_active);
 
     const safeName = escapeHtml(dev.custom_name || dev.hostname || "Device");
     const ipLabel = dev.ip ? `${dev.ip}/ 24` : '192.168.0.x';
@@ -472,7 +510,7 @@ function renderTopologyMap(overviewData, devices) {
       `;
     } else {
       // Standard Node (Adaptive Light/Dark Theme)
-      const isOnline = dev.is_active;
+      const isOnline = (!isRouterDown && dev.is_active);
       let cardFill, cardStroke, nameFill, subFill, iconStroke, iconBoxFill, cardOpacity;
 
       if (isOnline) {
@@ -487,11 +525,13 @@ function renderTopologyMap(overviewData, devices) {
         cardFill = isDark ? '#12141a' : '#f1f5f9';
         cardStroke = isDark ? '#202430' : '#e2e8f0';
         nameFill = isDark ? '#94a3b8' : '#64748b';
-        subFill = isDark ? '#64748b' : '#94a3b8';
+        subFill = isRouterDown ? '#ef4444' : (isDark ? '#64748b' : '#94a3b8');
         iconStroke = isDark ? '#64748b' : '#94a3b8';
         iconBoxFill = isDark ? '#181b24' : '#e2e8f0';
-        cardOpacity = '0.7';
+        cardOpacity = isRouterDown ? '0.6' : '0.7';
       }
+
+      const displaySub = isRouterDown ? `${ipLabel} • Lost` : ipLabel;
 
       svgContent += `
         <g class="topo-node" onclick="openDeviceDetail('${dev.mac}')" style="cursor: pointer; opacity: ${cardOpacity};">
@@ -510,7 +550,7 @@ function renderTopologyMap(overviewData, devices) {
             ${truncateText(safeName, 15)}
           </text>
           <text x="${s.x + 60}" y="${s.y + 45}" fill="${subFill}" font-size="11" font-family="system-ui, sans-serif">
-            ${ipLabel}
+            ${displaySub}
           </text>
         </g>
       `;
@@ -1008,6 +1048,47 @@ async function loadInternetHealth() {
       }
     }
 
+    // WAN & ISP Connection Details
+    const wan = data.wan_info || {};
+    const extIpEl = document.getElementById('wan-ext-ip');
+    if (extIpEl) extIpEl.textContent = wan.external_ip || '--';
+
+    const gwIpEl = document.getElementById('wan-gw-ip');
+    if (gwIpEl) gwIpEl.textContent = wan.gateway_ip || '--';
+
+    const dnsEl = document.getElementById('wan-dns');
+    if (dnsEl) dnsEl.textContent = wan.dns_servers_str || '--';
+
+    const connTypeEl = document.getElementById('wan-conn-type');
+    if (connTypeEl) {
+      const typeStr = [wan.transport_type, wan.connection_type].filter(Boolean).join(' • ');
+      connTypeEl.textContent = typeStr || '--';
+    }
+
+    const macEl = document.getElementById('wan-mac');
+    if (macEl) macEl.textContent = wan.mac_address || '--';
+
+    const uptimeEl2 = document.getElementById('wan-uptime');
+    if (uptimeEl2) {
+      if (wan.uptime_seconds) {
+        const secs = wan.uptime_seconds;
+        const d = Math.floor(secs / 86400);
+        const h = Math.floor((secs % 86400) / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        uptimeEl2.textContent = d > 0 ? `${d}d ${h}h ${m}m` : (h > 0 ? `${h}h ${m}m` : `${m}m ${secs % 60}s`);
+      } else {
+        uptimeEl2.textContent = '--';
+      }
+    }
+
+    const badgeEl = document.getElementById('wan-conn-status-badge');
+    if (badgeEl) {
+      const isConnected = wan.connection_status === 'Connected' || isOnline;
+      badgeEl.textContent = isConnected ? 'Connected' : 'Disconnected';
+      badgeEl.className = isConnected ? 'category-badge network' : 'category-badge iot';
+      badgeEl.style.color = isConnected ? 'var(--accent-green)' : 'var(--accent-rose)';
+    }
+
     const ctx = document.getElementById('healthLatencyChart');
     if (!ctx) return;
 
@@ -1206,7 +1287,261 @@ function closeDeviceModal() {
   document.getElementById('device-modal').classList.remove('open');
 }
 
+// Clipboard copy helper
+function copyText(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const text = el.textContent.trim();
+  if (!text || text === '--') return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(`Copied ${text} to clipboard!`);
+    }).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  showToast(`Copied ${text} to clipboard!`);
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('global-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'global-toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--bg-card);border:1px solid var(--accent-blue);color:var(--text-primary);padding:10px 18px;border-radius:8px;font-size:0.85rem;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:9999;transition:opacity 0.25s ease;pointer-events:none;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => {
+    toast.style.opacity = '0';
+  }, 2500);
+}
+
+// Router Gateway Details & Diagnostics Modal
+async function openRouterModal() {
+  const modal = document.getElementById('router-modal');
+  if (!modal) return;
+
+  try {
+    const res = await fetch('/api/wan');
+    if (res.ok) {
+      const wan = await res.json();
+      const extIpEl = document.getElementById('rm-ext-ip');
+      const gwIpEl = document.getElementById('rm-gw-ip');
+      const dnsEl = document.getElementById('rm-dns');
+      const connTypeEl = document.getElementById('rm-conn-type');
+      const statusEl = document.getElementById('rm-status');
+
+      if (extIpEl) extIpEl.textContent = wan.external_ip || '--';
+      if (gwIpEl) gwIpEl.textContent = wan.gateway_ip || '--';
+      if (dnsEl) dnsEl.textContent = wan.dns_servers_str || '--';
+      if (connTypeEl) connTypeEl.textContent = [wan.transport_type, wan.connection_type].filter(Boolean).join(' • ') || 'PPPoE';
+      if (statusEl) {
+        statusEl.textContent = wan.connection_status || 'Online';
+        statusEl.style.color = (wan.connection_status === 'Connected') ? 'var(--accent-green)' : 'var(--accent-amber)';
+      }
+    }
+  } catch (e) {
+    console.error("Router diagnostics fetch error:", e);
+  }
+
+  modal.classList.add('open');
+}
+
+function closeRouterModal() {
+  const modal = document.getElementById('router-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+// Router Reboot Handlers & Confirmation
+function openRebootModal() {
+  const modal = document.getElementById('reboot-modal');
+  if (!modal) return;
+  
+  const initView = document.getElementById('reboot-modal-initial-view');
+  const progView = document.getElementById('reboot-modal-progress-view');
+  if (initView) initView.style.display = 'block';
+  if (progView) progView.style.display = 'none';
+
+  const confirmBtn = document.getElementById('reboot-confirm-btn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      Yes, Reboot Now
+    `;
+  }
+  modal.classList.add('open');
+}
+
+function closeRebootModal() {
+  const modal = document.getElementById('reboot-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+let rebootCountdownTimer = null;
+let rebootStatusPollTimer = null;
+
+async function executeRouterReboot() {
+  const initView = document.getElementById('reboot-modal-initial-view');
+  const progView = document.getElementById('reboot-modal-progress-view');
+  const confirmBtn = document.getElementById('reboot-confirm-btn');
+  const cdEl = document.getElementById('reboot-countdown');
+  const msgEl = document.getElementById('reboot-progress-msg');
+
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Sending signal...';
+  }
+
+  try {
+    const res = await fetch('/api/router/reboot', { method: 'POST' });
+    let data;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      data = { detail: text || res.statusText };
+    }
+
+    if (!res.ok) {
+      alert(`Reboot command rejected: ${data.detail || 'Could not communicate with router.'}`);
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Yes, Reboot Now
+        `;
+      }
+      return;
+    }
+
+    // Immediately reflect rebooting state on topology and health views
+    if (currentView === 'dashboard') loadDashboard();
+    else if (currentView === 'health') loadInternetHealth();
+
+    // Switch to countdown view
+    if (initView) initView.style.display = 'none';
+    if (progView) progView.style.display = 'block';
+
+    let remaining = 65;
+    if (cdEl) {
+      cdEl.textContent = `${remaining}s`;
+      cdEl.style.color = 'var(--accent-amber)';
+    }
+    if (msgEl) {
+      msgEl.textContent = 'Hardware restart initiated. Power cycling gateway...';
+      msgEl.style.color = 'var(--text-muted)';
+    }
+
+    clearInterval(rebootCountdownTimer);
+    clearInterval(rebootStatusPollTimer);
+
+    rebootCountdownTimer = setInterval(() => {
+      remaining--;
+      if (remaining > 45) {
+        if (msgEl) msgEl.textContent = 'Power cycling hardware...';
+      } else if (remaining > 25) {
+        if (msgEl) msgEl.textContent = 'Booting router firmware & web server...';
+      } else if (remaining > 5) {
+        if (msgEl) msgEl.textContent = 'Reconnecting to gateway (192.168.0.1)...';
+      } else {
+        if (msgEl) msgEl.textContent = 'Probing gateway & authenticating...';
+      }
+
+      if (remaining <= 0) {
+        clearInterval(rebootCountdownTimer);
+        if (cdEl) cdEl.textContent = 'Probing...';
+      } else {
+        if (cdEl) cdEl.textContent = `${remaining}s`;
+      }
+    }, 1000);
+
+    // Wait 15s for the reboot cycle to begin, then poll every 2s
+    let attempts = 0;
+    setTimeout(() => {
+      rebootStatusPollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          const sRes = await fetch('/api/status');
+          if (sRes.ok) {
+            const s = await sRes.json();
+            if (s.router_connected) {
+              if (s.internet_online) {
+                clearInterval(rebootCountdownTimer);
+                clearInterval(rebootStatusPollTimer);
+                if (cdEl) {
+                  cdEl.textContent = 'ONLINE';
+                  cdEl.style.color = 'var(--accent-green)';
+                }
+                if (msgEl) {
+                  msgEl.textContent = 'Reboot complete! Router and Internet reconnected.';
+                  msgEl.style.color = 'var(--accent-green)';
+                }
+                setTimeout(() => {
+                  closeRebootModal();
+                  if (currentView === 'dashboard') loadDashboard();
+                  else if (currentView === 'health') loadInternetHealth();
+                }, 1400);
+              } else {
+                // Router is back up, waiting for WAN PPPoE to dial
+                if (cdEl) {
+                  cdEl.textContent = 'ROUTER UP';
+                  cdEl.style.color = 'var(--accent-cyan)';
+                }
+                if (msgEl) {
+                  msgEl.textContent = 'Gateway is up! Reconnecting internet (PPPoE)...';
+                  msgEl.style.color = 'var(--accent-cyan)';
+                }
+                if (attempts > 30) {
+                  // After waiting for WAN, auto-close anyway
+                  clearInterval(rebootCountdownTimer);
+                  clearInterval(rebootStatusPollTimer);
+                  setTimeout(() => {
+                    closeRebootModal();
+                    if (currentView === 'dashboard') loadDashboard();
+                    else if (currentView === 'health') loadInternetHealth();
+                  }, 1500);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Expected while router is cycling power
+        }
+
+        if (attempts > 50) {
+          clearInterval(rebootStatusPollTimer);
+          clearInterval(rebootCountdownTimer);
+          if (msgEl) {
+            msgEl.textContent = 'Reboot cycle took longer than expected. Please check router.';
+          }
+        }
+      }, 2000);
+    }, 15000);
+
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Yes, Reboot Now';
+    }
+  }
+}
+
 // Live Background Status Poller
+let prevRouterState = null;
 async function pollStatus() {
   try {
     const res = await fetch('/api/status');
@@ -1221,8 +1556,8 @@ async function pollStatus() {
         rBadge.className = 'status-badge online';
         rText.textContent = 'Connected';
       } else {
-        rBadge.className = 'status-badge offline';
-        rText.textContent = s.password_configured ? 'Retrying' : 'No Pass';
+        rBadge.className = s.is_rebooting ? 'status-badge rebooting' : 'status-badge offline';
+        rText.textContent = s.is_rebooting ? 'Rebooting' : (s.password_configured ? 'Retrying' : 'No Pass');
       }
 
       if (s.internet_online) {
@@ -1232,6 +1567,13 @@ async function pollStatus() {
         iBadge.className = 'status-badge offline';
         iText.textContent = 'Outage';
       }
+
+      // Auto refresh views when router transitions from offline/rebooting to connected
+      if (prevRouterState === false && s.router_connected) {
+        if (currentView === 'dashboard') loadDashboard();
+        else if (currentView === 'health') loadInternetHealth();
+      }
+      prevRouterState = Boolean(s.router_connected);
     }
   } catch (e) {}
 }

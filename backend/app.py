@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
+import time
 
 from .config import STATIC_DIR, DEFAULT_ROUTER_URL, DEFAULT_ROUTER_USER, DEFAULT_POLL_INTERVAL
 from .database import init_db, get_connection, get_setting, set_setting, log_event
@@ -58,16 +59,22 @@ def get_system_status():
         "collector_running": collector_instance.is_running,
         "router_connected": collector_instance.status["router_connected"],
         "internet_online": collector_instance.status["internet_online"],
+        "is_rebooting": collector_instance.status.get("is_rebooting", False),
         "last_error": collector_instance.status["last_error"],
         "active_devices": collector_instance.status["active_devices"],
         "current_down_bps": collector_instance.status["current_down_speed_bps"],
         "last_poll_time": collector_instance.last_poll_time,
-        "password_configured": bool(get_setting("router_password"))
+        "password_configured": bool(get_setting("router_password")),
+        "wan_info": collector_instance.status.get("wan_info", {})
     }
 
 @app.get("/api/overview")
 def overview():
-    return get_network_overview()
+    data = get_network_overview()
+    data["is_rebooting"] = collector_instance.status.get("is_rebooting", False)
+    data["router_connected"] = collector_instance.status["router_connected"]
+    data["wan_info"] = collector_instance.status.get("wan_info", {})
+    return data
 
 @app.get("/api/devices")
 def list_devices():
@@ -107,7 +114,67 @@ def traffic_analytics(period_hours: int = 24):
 
 @app.get("/api/health")
 def internet_health():
-    return get_internet_health_analytics()
+    data = get_internet_health_analytics()
+    data["is_rebooting"] = collector_instance.status.get("is_rebooting", False)
+    data["router_connected"] = collector_instance.status["router_connected"]
+    data["wan_info"] = collector_instance.status.get("wan_info", {})
+    return data
+
+@app.get("/api/wan")
+def get_wan_status():
+    wan = collector_instance.status.get("wan_info", {})
+    if not wan and collector_instance.client and collector_instance.client.token:
+        ok, live_wan = collector_instance.client.fetch_wan_status()
+        if ok and live_wan:
+            collector_instance.status["wan_info"] = live_wan
+            return live_wan
+    return wan or {
+        "external_ip": "Unavailable",
+        "gateway_ip": "Unavailable",
+        "dns_servers": [],
+        "dns_servers_str": "Unavailable",
+        "connection_status": "Disconnected",
+        "transport_type": "Unknown",
+        "mac_address": "",
+        "uptime_seconds": 0
+    }
+
+@app.post("/api/router/reboot")
+def trigger_router_reboot():
+    router_pass = get_setting("router_password", "")
+    if not router_pass:
+        raise HTTPException(status_code=400, detail="Router password is not configured in Settings.")
+
+    client = collector_instance.client
+    if not client:
+        raise HTTPException(status_code=500, detail="Router client is not initialized.")
+
+    if not client.token:
+        logged_in = client.login(router_pass)
+        if not logged_in:
+            raise HTTPException(status_code=502, detail=client.last_error or "Could not authenticate with router.")
+
+    success, msg = client.reboot()
+    if success:
+        log_event("ROUTER_REBOOT", "Router Reboot Initiated", "Reboot command dispatched to TP-Link gateway.")
+        collector_instance.status["is_rebooting"] = True
+        collector_instance.status["reboot_start_time"] = time.time()
+        collector_instance.status["router_connected"] = False
+        collector_instance.status["internet_online"] = False
+        collector_instance.status["active_devices"] = 0
+        collector_instance.status["last_error"] = "Router is rebooting..."
+        try:
+            from .database import record_health
+            conn = get_connection()
+            conn.execute("UPDATE devices SET is_active = 0")
+            conn.commit()
+            conn.close()
+            record_health(is_online=False, internet_lat=0.0, gateway_lat=0.0, packet_loss=100.0)
+        except Exception:
+            pass
+        return {"status": "success", "message": msg}
+    else:
+        raise HTTPException(status_code=502, detail=msg)
 
 @app.get("/api/events")
 def list_events(limit: int = 50):

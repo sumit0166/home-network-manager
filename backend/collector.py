@@ -7,10 +7,12 @@ from .database import (
     upsert_device,
     mark_inactive_devices,
     record_traffic_snapshot,
-    record_health
+    record_health,
+    get_connection,
+    log_event
 )
 from .router_client import RouterClient
-from .health_monitor import check_network_health
+from .health_monitor import check_network_health, probe_latency
 
 class NetworkCollector:
     def __init__(self):
@@ -24,11 +26,14 @@ class NetworkCollector:
         self.status = {
             "router_connected": False,
             "internet_online": False,
+            "is_rebooting": False,
+            "reboot_start_time": 0,
             "last_error": None,
             "active_devices": 0,
             "total_devices": 0,
             "current_down_speed_bps": 0,
-            "current_up_speed_bps": 0
+            "current_up_speed_bps": 0,
+            "wan_info": {}
         }
 
     def start(self):
@@ -60,10 +65,39 @@ class NetworkCollector:
                     self.poll_interval = 5
 
             now = time.time()
+            gw_ip = router_url.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
+
+            # Special Handling: Router in the middle of a Hardware Reboot
+            if self.status.get("is_rebooting"):
+                reboot_elapsed = now - self.status.get("reboot_start_time", 0)
+                # First 18s: router CPU is resetting, keep status offline
+                if reboot_elapsed < 18:
+                    time.sleep(2)
+                    continue
+                # After 18s: probe router gateway port 80
+                gw_ok, _ = probe_latency(gw_ip, 80, timeout=1.0)
+                if not gw_ok:
+                    time.sleep(2)
+                    continue
+                # Port 80 is responding! Attempt to re-authenticate
+                if router_pass:
+                    logged_in = self.client.login(router_pass)
+                    if logged_in:
+                        self.status["is_rebooting"] = False
+                        self.status["router_connected"] = True
+                        self.status["last_error"] = None
+                        # Immediately probe health so internet online status updates right away
+                        h = check_network_health(gateway_ip=gw_ip)
+                        record_health(h["is_online"], h["internet_latency_ms"], h["gateway_latency_ms"], h["packet_loss_pct"])
+                        self.status["internet_online"] = h["is_online"]
+                        last_health_time = now
+                        log_event("ROUTER_RECONNECT", "Router Reboot Complete", "Gateway router is back online and re-authenticated.")
+                    else:
+                        time.sleep(2)
+                        continue
 
             # 1. Health Probe (every 10 seconds)
             if now - last_health_time >= 10:
-                gw_ip = router_url.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
                 health = check_network_health(gateway_ip=gw_ip)
                 record_health(
                     is_online=health["is_online"],
@@ -85,7 +119,18 @@ class NetworkCollector:
                     if not logged_in:
                         self.status["router_connected"] = False
                         self.status["last_error"] = self.client.last_error
-                        time.sleep(4)
+                        self.status["active_devices"] = 0
+                        self.status["current_down_speed_bps"] = 0
+                        self.status["current_up_speed_bps"] = 0
+                        # Mark all devices inactive in SQLite since router is disconnected
+                        try:
+                            conn = get_connection()
+                            conn.execute("UPDATE devices SET is_active = 0")
+                            conn.commit()
+                            conn.close()
+                        except Exception:
+                            pass
+                        time.sleep(3)
                         continue
 
                 # Query 2.1: LAN Hosts (/cgi?5)
@@ -109,10 +154,23 @@ class NetworkCollector:
                     self.client.token = None
                     self.status["router_connected"] = False
                     self.status["last_error"] = self.client.last_error
+                    self.status["active_devices"] = 0
+                    try:
+                        conn = get_connection()
+                        conn.execute("UPDATE devices SET is_active = 0")
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
                 else:
                     self.status["router_connected"] = True
                     self.status["last_error"] = None
                     self.last_poll_time = int(now)
+
+                    # Query 2.3: WAN Status (/cgi?1)
+                    ok_wan, wan_data = self.client.fetch_wan_status()
+                    if ok_wan and wan_data:
+                        self.status["wan_info"] = wan_data
 
                     # Union of all known MACs
                     all_macs = set(lan_hosts_map.keys()).union(set(stats_map.keys()))

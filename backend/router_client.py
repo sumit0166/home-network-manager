@@ -21,6 +21,11 @@ STAT_PAYLOAD = (
 )
 
 LAN_HOST_PAYLOAD = "[LAN_HOST_ENTRY#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
+WAN_STATUS_PAYLOAD = (
+    "[WAN_PPP_CONN#1,1,1,0,0,0#0,0,0,0,0,0]0,0\r\n"
+    "[WAN_IP_CONN#1,1,1,0,0,0#0,0,0,0,0,0]0,0\r\n"
+)
+REBOOT_PAYLOAD = "[ACT_REBOOT#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
 
 def md5_encrypt(val: str, ss: str) -> str:
     """Computes: hex_md5(ss + val + ss)"""
@@ -45,6 +50,21 @@ class RouterClient:
     def login(self, password: str) -> bool:
         """Performs full handshake and retrieves the token."""
         try:
+            # Purge any stale session cookies or broken sockets before initiating fresh handshake
+            if hasattr(self, 'session') and self.session:
+                try:
+                    self.session.cookies.clear()
+                    self.session.close()
+                except Exception:
+                    pass
+            self.session = requests.Session()
+            self.session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+                "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8",
+                "DNT": "1",
+                "Connection": "keep-alive"
+            })
+
             # Step 0: Pre-flight
             self.session.get(f"{self.base_url}/", timeout=4)
 
@@ -214,3 +234,126 @@ class RouterClient:
                 entries.append(entry)
 
         return entries
+
+    def fetch_wan_status(self) -> Tuple[bool, Dict]:
+        """Queries /cgi?1 using active session to retrieve external WAN IP, Gateway, DNS, connection type."""
+        if not self.token:
+            return False, {}
+
+        url = f"{self.base_url}/cgi?1"
+        headers = {
+            "TokenID": self.token,
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/",
+            "Content-Type": "text/plain",
+            "Accept": "*/*"
+        }
+
+        try:
+            resp = self.session.post(url, data=WAN_STATUS_PAYLOAD, headers=headers, timeout=5)
+            if resp.status_code != 200:
+                # Try PPPoE payload individually if multi-payload didn't return 200
+                resp = self.session.post(url, data="[WAN_PPP_CONN#1,1,1,0,0,0#0,0,0,0,0,0]0,0\r\n", headers=headers, timeout=5)
+                if resp.status_code != 200:
+                    return False, {}
+
+            wan_data = self._parse_wan_status(resp.text)
+            return True, wan_data
+        except Exception as e:
+            return False, {}
+
+    def _parse_wan_status(self, raw_text: str) -> Dict:
+        """Parses WAN_PPP_CONN or WAN_IP_CONN key-value response."""
+        data = {}
+        # Parse blocks in case both PPP and IP blocks returned
+        blocks = re.split(r'\[\d+,\d+,\d+,\d+,\d+,\d+\]\d+', raw_text)
+        
+        candidates = []
+        for block in blocks:
+            if not block.strip():
+                continue
+            entry = {}
+            for line in block.strip().splitlines():
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    entry[k.strip()] = v.strip()
+            if entry.get("externalIPAddress") or entry.get("connectionStatus"):
+                candidates.append(entry)
+
+        # Select candidate with valid external IP or first candidate
+        chosen = {}
+        for c in candidates:
+            ip = c.get("externalIPAddress", "")
+            if ip and ip != "0.0.0.0":
+                chosen = c
+                break
+        if not chosen and candidates:
+            chosen = candidates[0]
+
+        ext_ip = chosen.get("externalIPAddress", "")
+        gw_ip = chosen.get("defaultGateway", "") or chosen.get("remoteIPAddress", "")
+        dns_raw = chosen.get("DNSServers", "")
+        dns_list = [d.strip() for d in dns_raw.split(",") if d.strip() and d.strip() != "0.0.0.0"]
+        conn_status = chosen.get("connectionStatus", "Connected" if ext_ip and ext_ip != "0.0.0.0" else "Disconnected")
+        transport = chosen.get("transportType", "") or chosen.get("connectionType", "PPPoE")
+        mac = chosen.get("MACAddress", "")
+        if mac:
+            mac = mac.replace("-", ":").upper()
+
+        try:
+            uptime_sec = int(chosen.get("uptime", 0))
+        except (ValueError, TypeError):
+            uptime_sec = 0
+
+        return {
+            "external_ip": ext_ip if ext_ip and ext_ip != "0.0.0.0" else "Unavailable",
+            "gateway_ip": gw_ip if gw_ip and gw_ip != "0.0.0.0" else "Unavailable",
+            "dns_servers": dns_list,
+            "dns_servers_str": ", ".join(dns_list) if dns_list else "Not Available",
+            "connection_status": conn_status,
+            "connection_type": chosen.get("connectionType", "IP_Routed"),
+            "transport_type": transport,
+            "mac_address": mac,
+            "uptime_seconds": uptime_sec,
+            "interface_name": chosen.get("name", "") or chosen.get("X_TP_IfName", "ppp0"),
+            "username": chosen.get("username", "")
+        }
+
+    def reboot(self) -> Tuple[bool, str]:
+        """Sends hardware reboot command to router: POST /cgi?7 with [ACT_REBOOT#0,0,0,0,0,0#0,0,0,0,0,0]0,0."""
+        if not self.token:
+            return False, "Router client is not authenticated (TokenID missing)."
+
+        url = f"{self.base_url}/cgi?7"
+        headers = {
+            "TokenID": self.token,
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/",
+            "Content-Type": "text/plain",
+            "Accept": "*/*"
+        }
+
+        try:
+            resp = self.session.post(url, data=REBOOT_PAYLOAD, headers=headers, timeout=6)
+            self.token = None
+            self.is_connected = False
+            try:
+                self.session.cookies.clear()
+                self.session.close()
+            except Exception:
+                pass
+            if resp.status_code == 200:
+                return True, "Reboot command received successfully. Router is restarting."
+            return False, f"Router returned HTTP {resp.status_code}"
+        except (requests.ConnectionError, requests.Timeout):
+            # When the router reboots immediately, closing socket/resetting connection is normal
+            self.token = None
+            self.is_connected = False
+            try:
+                self.session.cookies.clear()
+                self.session.close()
+            except Exception:
+                pass
+            return True, "Reboot command sent (connection terminated as router restarts)."
+        except Exception as e:
+            return False, f"Reboot request failed: {str(e)}"
