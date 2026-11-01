@@ -33,8 +33,8 @@ def main():
     print(f"  Local SQLite Database:     {DB_PATH}")
     print("=" * 70)
 
-    if not args.no_browser:
-        Timer(1.2, lambda: webbrowser.open(url)).start()
+    # if not args.no_browser:
+    #     Timer(1.2, lambda: webbrowser.open(url)).start()
 
     uvicorn.run("backend.app:app", host="0.0.0.0", port=args.port, log_level="info")
 

@@ -132,6 +132,8 @@ def get_devices_summary() -> List[Dict[str, Any]]:
         """, (d["mac"],)).fetchone()
 
         today_b = today_map.get(d["mac"], 0)
+        is_act = bool(d["is_active"])
+        speed_bytes = (stat["curr_bytes"] if stat else 0) if is_act else 0
 
         result.append({
             "mac": d["mac"],
@@ -143,9 +145,9 @@ def get_devices_summary() -> List[Dict[str, Any]]:
             "interface": d["interface"] or "",
             "first_seen": d["first_seen"],
             "last_seen": d["last_seen"],
-            "is_active": bool(d["is_active"]),
-            "current_speed_bytes": stat["curr_bytes"] if stat else 0,
-            "current_speed_human": f"{format_bytes_human(stat['curr_bytes'] if stat else 0)}/s",
+            "is_active": is_act,
+            "current_speed_bytes": speed_bytes,
+            "current_speed_human": f"{format_bytes_human(speed_bytes)}/s" if is_act else "0.0 B/s",
             "today_bytes": today_b,
             "today_bytes_human": format_bytes_human(today_b),
             "total_bytes": stat["total_bytes"] if stat else 0,
@@ -349,6 +351,7 @@ def get_internet_health_analytics() -> Dict[str, Any]:
 
     return {
         "uptime_pct": uptime_pct,
+        "is_online": bool(latest_health["is_online"]) if latest_health else False,
         "gateway_online": bool(latest_health and latest_health["gateway_latency_ms"] > 0),
         "current_gateway_lat": round(latest_health["gateway_latency_ms"], 1) if latest_health else 0.0,
         "current_internet_lat": round(latest_health["internet_latency_ms"], 1) if latest_health else 0.0,

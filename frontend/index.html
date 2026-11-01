@@ -428,25 +428,25 @@
         <div class="grid grid-cols-4" style="margin-bottom: 24px;">
           <div class="card stat-card">
             <div class="stat-info">
-              <div class="stat-label">Gateway Status</div>
-              <div class="stat-value" id="health-gw-status" style="color: var(--accent-green);">Online</div>
-              <div class="stat-sub"><span id="health-gw-lat">0</span>ms latency</div>
+              <div class="stat-label">Internet Status</div>
+              <div class="stat-value" id="health-internet-status" style="color: var(--accent-green);">Online</div>
+              <div class="stat-sub" id="health-internet-sub">Connected via ISP</div>
             </div>
-            <div class="stat-icon green"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></div>
+            <div class="stat-icon green" id="health-internet-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6H8l4-6z"/></svg></div>
           </div>
           <div class="card stat-card">
             <div class="stat-info">
-              <div class="stat-label">Internet Availability</div>
-              <div class="stat-value" id="health-uptime-val" style="color: var(--accent-cyan);">100%</div>
-              <div class="stat-sub">Past 24 hours uptime</div>
+              <div class="stat-label">Gateway (Router)</div>
+              <div class="stat-value" id="health-gw-status" style="color: var(--accent-green);">Online</div>
+              <div class="stat-sub"><span id="health-gw-lat">0</span>ms latency (192.168.0.1)</div>
             </div>
-            <div class="stat-icon cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6H8l4-6z"/></svg></div>
+            <div class="stat-icon cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></div>
           </div>
           <div class="card stat-card">
             <div class="stat-info">
               <div class="stat-label">WAN Latency</div>
-              <div class="stat-value" id="health-wan-lat" style="color: var(--accent-blue);">18ms</div>
-              <div class="stat-sub">Cloud DNS ping</div>
+              <div class="stat-value" id="health-wan-lat" style="color: var(--accent-blue);">--</div>
+              <div class="stat-sub" id="health-wan-sub">Cloud DNS ping (1.1.1.1)</div>
             </div>
             <div class="stat-icon blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
           </div>
@@ -454,9 +454,9 @@
             <div class="stat-info">
               <div class="stat-label">Packet Loss</div>
               <div class="stat-value" id="health-packet-loss" style="color: var(--accent-green);">0.0%</div>
-              <div class="stat-sub">Zero dropped probes</div>
+              <div class="stat-sub" id="health-packet-loss-sub">Zero dropped probes</div>
             </div>
-            <div class="stat-icon amber"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="stat-icon amber" id="health-loss-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
           </div>
         </div>
 

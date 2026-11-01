@@ -132,7 +132,16 @@ async function loadDashboard() {
     document.getElementById('stat-total-devices').textContent = data.total_devices;
     document.getElementById('stat-current-rate').textContent = data.current_traffic_human;
     document.getElementById('stat-today-data').textContent = data.total_data_today_human;
-    document.getElementById('stat-latency-val').textContent = `${data.internet_latency_ms}ms`;
+    
+    const healthStatusEl = document.getElementById('stat-health-status');
+    if (healthStatusEl) {
+      healthStatusEl.textContent = data.is_online ? 'Online' : 'Outage';
+      healthStatusEl.style.color = data.is_online ? 'var(--accent-green)' : 'var(--accent-rose)';
+    }
+    const latValEl = document.getElementById('stat-latency-val');
+    if (latValEl) {
+      latValEl.textContent = data.is_online ? `${data.internet_latency_ms}ms` : 'Disconnected';
+    }
 
     if (data.top_consumer) {
       document.getElementById('top-consumer-name').textContent = data.top_consumer.name;
@@ -258,7 +267,8 @@ function renderTopologyMap(overviewData, devices) {
   const defaultActiveWire = isDark ? '#384052' : '#94a3b8';
   const offlineWireColor = isDark ? '#232836' : '#cbd5e1';
 
-  const ispName = escapeHtml(overviewData.isp_name || 'Local ISP');
+  const ispName = escapeHtml(overviewData.isp_name || 'Hathway');
+  const isInternetOnline = Boolean(overviewData.is_online);
 
   // Build SVG XML
   let svgContent = `
@@ -317,10 +327,16 @@ function renderTopologyMap(overviewData, devices) {
     <rect width="960" height="520" rx="14" fill="${bgColor}"/>
     <rect width="960" height="520" rx="14" fill="url(#topoGridPattern)"/>
 
-    <!-- WAN to Router Vertical Link -->
-    <line x1="480" y1="96" x2="480" y2="206" stroke="${wanLineColor}" stroke-width="2"/>
-    <circle cx="480" cy="104" r="4" fill="#10b981" filter="url(#glow-green)"/>
-    <circle cx="480" cy="198" r="4" fill="#10b981" filter="url(#glow-green)"/>
+    <!-- WAN to Router Vertical Link (Dynamic: Green when online, Red/Dashed on Outage) -->
+    ${isInternetOnline ? `
+      <line x1="480" y1="96" x2="480" y2="206" stroke="${wanLineColor}" stroke-width="2"/>
+      <circle cx="480" cy="99" r="4" fill="#10b981" filter="url(#glow-green)"/>
+      <circle cx="480" cy="204" r="4" fill="#10b981" filter="url(#glow-green)"/>
+    ` : `
+      <line x1="480" y1="96" x2="480" y2="206" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <circle cx="480" cy="99" r="4.5" fill="#ef4444" filter="url(#glow-red)"/>
+      <circle cx="480" cy="204" r="4.5" fill="#ef4444" filter="url(#glow-red)"/>
+    `}
   `;
 
   // Draw Device Connecting Wires first (behind node cards)
@@ -366,10 +382,17 @@ function renderTopologyMap(overviewData, devices) {
     }
   }
 
-  // Draw Top Node: Configurable ISP / Internet WAN (Local ISP / Internet Service Provider)
+  // Draw Top Node: Configurable ISP / Internet WAN (Dynamic Online vs Outage)
+  const ispStroke = isInternetOnline ? ispCardStroke : '#ef4444';
+  const ispFilter = isInternetOnline ? '' : 'filter="url(#glow-red)"';
+  const ispLedColor = isInternetOnline ? '#10b981' : '#ef4444';
+  const ispLedFilter = isInternetOnline ? 'filter="url(#glow-green)"' : 'filter="url(#glow-red)"';
+  const ispStatusText = isInternetOnline ? 'ISP • Connected' : '● Internet Outage / Disconnected';
+  const ispStatusColor = isInternetOnline ? ispTextSub : '#f43f5e';
+
   svgContent += `
     <g class="topo-node" onclick="switchView('health')" style="cursor: pointer;">
-      <rect x="370" y="42" width="220" height="54" rx="14" fill="${ispCardFill}" stroke="${ispCardStroke}" stroke-width="1.5"/>
+      <rect x="370" y="42" width="220" height="54" rx="14" fill="${ispCardFill}" stroke="${ispStroke}" stroke-width="${isInternetOnline ? 1.5 : 2}" ${ispFilter}/>
       <!-- Inner Icon Box -->
       <rect x="382" y="49" width="40" height="40" rx="10" fill="${ispIconBox}"/>
       <!-- Modem / ISP Icon -->
@@ -377,12 +400,16 @@ function renderTopologyMap(overviewData, devices) {
         <rect x="1" y="7" width="22" height="9" rx="2"/>
         <line x1="5" y1="1" x2="5" y2="7"/>
         <line x1="19" y1="1" x2="19" y2="7"/>
-        <circle cx="6" cy="11.5" r="1" fill="#10b981"/>
-        <circle cx="11" cy="11.5" r="1" fill="#10b981"/>
+        <circle cx="6" cy="11.5" r="1.5" fill="${ispLedColor}" ${ispLedFilter}/>
+        <circle cx="11" cy="11.5" r="1.5" fill="${ispLedColor}" ${ispLedFilter}/>
       </g>
       <!-- Labels -->
-      <text x="432" y="66" fill="${ispTextMain}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">${ispName}</text>
-      <text x="432" y="82" fill="${ispTextSub}" font-size="11" font-family="system-ui, sans-serif">Internet Service Provider</text>
+      <text x="432" y="66" fill="${isInternetOnline ? ispTextMain : '#f43f5e'}" font-size="13" font-weight="700" font-family="system-ui, sans-serif">
+        ${ispName}${isInternetOnline ? '' : ' (Outage)'}
+      </text>
+      <text x="432" y="82" fill="${ispStatusColor}" font-size="11" font-weight="${isInternetOnline ? 400 : 600}" font-family="system-ui, sans-serif">
+        ${ispStatusText}
+      </text>
     </g>
   `;
 
@@ -894,8 +921,32 @@ async function loadInternetHealth() {
     if (!res.ok) return;
     const data = await res.json();
 
-    document.getElementById('health-uptime-val').textContent = `${data.uptime_pct}%`;
+    const isOnline = Boolean(data.is_online);
 
+    // Internet Status card
+    const internetStatusEl = document.getElementById('health-internet-status');
+    const internetSubEl = document.getElementById('health-internet-sub');
+    const internetIconEl = document.getElementById('health-internet-icon');
+    if (internetStatusEl) {
+      internetStatusEl.textContent = isOnline ? 'Online' : 'Outage';
+      internetStatusEl.style.color = isOnline ? 'var(--accent-green)' : 'var(--accent-rose)';
+    }
+    if (internetSubEl) {
+      internetSubEl.textContent = isOnline 
+        ? `Connected via ISP • 24h Uptime: ${data.uptime_pct}%` 
+        : `Connection lost (DNS timeout) • 24h Uptime: ${data.uptime_pct}%`;
+    }
+    if (internetIconEl) {
+      internetIconEl.className = isOnline ? 'stat-icon green' : 'stat-icon rose';
+    }
+
+    // Legacy or optional uptime element check
+    const uptimeEl = document.getElementById('health-uptime-val');
+    if (uptimeEl) {
+      uptimeEl.textContent = `${data.uptime_pct}%`;
+    }
+
+    // Gateway / Router card
     const gwStatusEl = document.getElementById('health-gw-status');
     if (gwStatusEl) {
       gwStatusEl.textContent = data.gateway_online ? 'Online' : 'Unreachable';
@@ -907,15 +958,54 @@ async function loadInternetHealth() {
       gwLatEl.textContent = data.current_gateway_lat ?? 0;
     }
 
+    // WAN Latency card
     const wanLatEl = document.getElementById('health-wan-lat');
+    const wanSubEl = document.getElementById('health-wan-sub');
     if (wanLatEl) {
-      wanLatEl.textContent = `${data.current_internet_lat ?? 0}ms`;
+      if (isOnline) {
+        wanLatEl.textContent = `${data.current_internet_lat ?? 0}ms`;
+        wanLatEl.style.color = 'var(--accent-blue)';
+      } else {
+        wanLatEl.textContent = 'Timed Out';
+        wanLatEl.style.color = 'var(--accent-rose)';
+      }
+    }
+    if (wanSubEl) {
+      wanSubEl.textContent = isOnline ? 'Cloud DNS probe (1.1.1.1)' : 'Probe response failed';
     }
 
+    // Packet Loss card
     const lossEl = document.getElementById('health-packet-loss');
+    const lossSubEl = document.getElementById('health-packet-loss-sub');
+    const lossIconEl = document.getElementById('health-loss-icon');
+    const loss = data.current_packet_loss ?? 0;
     if (lossEl) {
-      lossEl.textContent = `${data.current_packet_loss ?? 0}%`;
-      lossEl.style.color = (data.current_packet_loss > 0) ? 'var(--accent-amber)' : 'var(--accent-green)';
+      lossEl.textContent = `${loss}%`;
+      if (!isOnline || loss >= 100) {
+        lossEl.style.color = 'var(--accent-rose)';
+      } else if (loss > 0) {
+        lossEl.style.color = 'var(--accent-amber)';
+      } else {
+        lossEl.style.color = 'var(--accent-green)';
+      }
+    }
+    if (lossSubEl) {
+      if (!isOnline || loss >= 100) {
+        lossSubEl.textContent = '100% probes lost (Outage)';
+      } else if (loss > 0) {
+        lossSubEl.textContent = `${loss}% probe packet loss`;
+      } else {
+        lossSubEl.textContent = 'Zero dropped probes';
+      }
+    }
+    if (lossIconEl) {
+      if (!isOnline || loss >= 100) {
+        lossIconEl.className = 'stat-icon rose';
+      } else if (loss > 0) {
+        lossIconEl.className = 'stat-icon amber';
+      } else {
+        lossIconEl.className = 'stat-icon green';
+      }
     }
 
     const ctx = document.getElementById('healthLatencyChart');
@@ -1234,5 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     if (currentView === 'dashboard') loadDashboard();
     else if (currentView === 'traffic') loadTrafficAnalytics();
+    else if (currentView === 'health') loadInternetHealth();
+    else if (currentView === 'devices') loadDevices();
   }, 5000);
 });

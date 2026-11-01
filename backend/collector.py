@@ -20,6 +20,7 @@ class NetworkCollector:
         self.is_running = False
         self.last_poll_time = 0
         self.poll_interval = DEFAULT_POLL_INTERVAL
+        self.prev_traffic = {}
         self.status = {
             "router_connected": False,
             "internet_online": False,
@@ -126,27 +127,42 @@ class NetworkCollector:
                         hostname = lan_info.get("hostname") or ""
                         interface = lan_info.get("interface") or ""
 
-                        curr_pkts = stat_info.get("currPkts", 0)
-                        curr_bytes = stat_info.get("currBytes", 0)
+                        raw_curr_pkts = stat_info.get("currPkts", 0)
+                        raw_curr_bytes = stat_info.get("currBytes", 0)
+                        raw_total_bytes = stat_info.get("totalBytes", 0)
                         router_active_flag = lan_info.get("active", None)
 
-                        # Determine if device is truly active:
-                        # 1. If router explicitly flags active=False in LAN hosts and 0 traffic -> INACTIVE
-                        # 2. If router flags active=True -> ACTIVE
-                        # 3. If curr_bytes > 0 or curr_pkts > 0 -> ACTIVE
-                        # 4. Otherwise (no traffic and unknown active flag) -> INACTIVE
-                        if router_active_flag is False and curr_bytes == 0 and curr_pkts == 0:
+                        # Track byte delta between polling cycles
+                        prev_total, prev_time = self.prev_traffic.get(mac, (raw_total_bytes, now))
+                        delta_bytes = max(0, raw_total_bytes - prev_total) if mac in self.prev_traffic else 0
+                        self.prev_traffic[mac] = (raw_total_bytes, now)
+
+                        # Determine if device is truly active on the network:
+                        # 1. Router explicitly reports active=0 in DHCP/WLAN host table -> INACTIVE
+                        if router_active_flag is False:
                             is_device_active = False
+                            effective_curr_bytes = 0
+                            effective_curr_pkts = 0
+                        # 2. Router explicitly reports active=1 in host table -> ACTIVE
                         elif router_active_flag is True:
                             is_device_active = True
-                        elif curr_bytes > 0 or curr_pkts > 0:
+                            # If total bytes didn't move, live rate is 0 B/s (stale router stats discarded)
+                            effective_curr_bytes = delta_bytes if delta_bytes > 0 else (raw_curr_bytes if raw_curr_bytes < 50000 else 0)
+                            effective_curr_pkts = raw_curr_pkts if (delta_bytes > 0 or raw_curr_bytes > 0) else 0
+                        # 3. Router host entry missing, but total_bytes is actively increasing -> ACTIVE
+                        elif delta_bytes > 0:
                             is_device_active = True
+                            effective_curr_bytes = delta_bytes
+                            effective_curr_pkts = raw_curr_pkts
+                        # 4. Otherwise (no traffic change and not flagged active) -> INACTIVE
                         else:
                             is_device_active = False
+                            effective_curr_bytes = 0
+                            effective_curr_pkts = 0
 
                         if is_device_active:
                             active_macs.append(mac)
-                            total_curr_bytes += curr_bytes
+                            total_curr_bytes += effective_curr_bytes
 
                         # Register or update device with accurate active flag
                         upsert_device(
@@ -161,13 +177,13 @@ class NetworkCollector:
                         if stat_info:
                             record_traffic_snapshot(
                                 mac=mac,
-                                total_bytes=stat_info.get("totalBytes", 0),
+                                total_bytes=raw_total_bytes,
                                 total_pkts=stat_info.get("totalPkts", 0),
-                                curr_bytes=curr_bytes,
-                                curr_pkts=curr_pkts,
-                                curr_icmp=stat_info.get("currIcmp", 0),
-                                curr_udp=stat_info.get("currUdp", 0),
-                                curr_syn=stat_info.get("currSyn", 0)
+                                curr_bytes=effective_curr_bytes,
+                                curr_pkts=effective_curr_pkts,
+                                curr_icmp=stat_info.get("currIcmp", 0) if is_device_active else 0,
+                                curr_udp=stat_info.get("currUdp", 0) if is_device_active else 0,
+                                curr_syn=stat_info.get("currSyn", 0) if is_device_active else 0
                             )
 
                     # Mark all devices not in active_macs as inactive
