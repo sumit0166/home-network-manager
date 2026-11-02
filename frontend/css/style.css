@@ -1149,3 +1149,77 @@ select option,
   font-size: 0.85rem;
   flex-shrink: 0;
 }
+
+/* Reports & Insights Modern Styles */
+.takeaway-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+[data-theme="light"] .takeaway-card {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.takeaway-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.takeaway-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.takeaway-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.takeaway-desc {
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.cat-dist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-dist-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.cat-dist-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+[data-theme="light"] .cat-dist-bar-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.cat-dist-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+

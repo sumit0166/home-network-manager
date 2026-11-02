@@ -612,43 +612,258 @@
 
       <!-- VIEW 7: REPORTS & INSIGHTS -->
       <section id="view-reports" class="view-section">
-        <div class="grid grid-cols-3" style="margin-bottom: 24px;">
-          <div class="card">
-            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Busiest Time Today</div>
-            <div id="rep-busiest-hour" style="font-size: 1.6rem; font-weight: 700; margin-top: 8px; color: var(--accent-amber);">--</div>
-            <p id="rep-busiest-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
+        <!-- 1. Executive Summary & Smart Takeaways -->
+        <div class="card" style="margin-bottom: 24px; position: relative; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); padding: 8px; border-radius: 10px; display: inline-flex;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </div>
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0;">Executive Intelligence & Fleet Insights</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0;">Synthesized network audit covering 30-day telemetry, ISP reliability, and bandwidth burn rate.</p>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadReports()" title="Refresh Insights" style="gap: 6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh Audit
+            </button>
           </div>
-
-          <div class="card">
-            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Top Device Today</div>
-            <div id="rep-top-today" style="font-size: 1.4rem; font-weight: 700; margin-top: 8px; color: var(--accent-cyan);">--</div>
-            <p id="rep-top-today-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
-          </div>
-
-          <div class="card">
-            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Top Device This Month</div>
-            <div id="rep-top-month" style="font-size: 1.4rem; font-weight: 700; margin-top: 8px; color: var(--accent-purple);">--</div>
-            <p id="rep-top-month-data" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">--</p>
+          <div id="reports-takeaways-container" class="grid grid-cols-2" style="gap: 14px;">
+            <!-- Rendered dynamically -->
           </div>
         </div>
 
-        <div class="card">
-          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 16px;">Dormant Devices (Unseen in > 7 Days)</h4>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Device Name</th>
-                  <th>IP Address</th>
-                  <th>MAC Address</th>
-                  <th>Last Seen</th>
-                </tr>
-              </thead>
-              <tbody id="dormant-devices-tbody">
-                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">None found.</td></tr>
-              </tbody>
-            </table>
+        <!-- 2. Primary Strategic Scorecards (SLA, Forecast, WAN Ratio) -->
+        <div class="grid grid-cols-3" style="margin-bottom: 24px; gap: 20px;">
+          
+          <!-- ISP SLA Card -->
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">ISP Quality & SLA</div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">30-Day Reliability Audit</div>
+                </div>
+                <div id="rep-sla-grade-badge" class="sla-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 1.25rem; font-weight: 800; padding: 4px 14px; border-radius: 10px;">A+</div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Uptime SLA</div>
+                  <div id="rep-sla-uptime" style="font-size: 1.15rem; font-weight: 700; color: var(--accent-green); margin-top: 2px;">--%</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Avg Recovery (MTTR)</div>
+                  <div id="rep-sla-mttr" style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Avg Ping / Loss</div>
+                  <div id="rep-sla-ping-loss" style="font-size: 0.92rem; font-weight: 600; color: var(--text-secondary); margin-top: 2px;">--ms / --%</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Jitter Peak Window</div>
+                  <div id="rep-sla-jitter" style="font-size: 0.92rem; font-weight: 600; color: var(--accent-amber); margin-top: 2px;">--</div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+              Based on continuous 60s ICMP gateway/cloud ping probes
+            </div>
           </div>
+
+          <!-- Monthly Forecast Card -->
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Bandwidth Forecast</div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">Burn Rate & Month-End Projection</div>
+                </div>
+                <div style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); padding: 6px; border-radius: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
+                </div>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Projected Total This Month</div>
+                <div id="rep-forecast-projected" style="font-size: 1.7rem; font-weight: 800; color: var(--accent-purple); margin-top: 2px;">--</div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Daily Consumption Rate</div>
+                  <div id="rep-forecast-daily" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">-- / day</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Actual MTD Usage</div>
+                  <div id="rep-forecast-mtd" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-cyan); margin-top: 2px;">--</div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+              Calculated from rolling 30-day device accounting snapshots
+            </div>
+          </div>
+
+          <!-- WAN Ingress vs Egress (SNMP ppp0) -->
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">WAN Ingress vs. Egress</div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">Hardware ppp0 Profile</div>
+                </div>
+                <span id="rep-wan-ratio-badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); font-size: 0.82rem; font-weight: 700; padding: 4px 10px; border-radius: 8px;">-- : 1</span>
+              </div>
+
+              <!-- Visual Ingress/Egress bar -->
+              <div style="margin: 14px 0 10px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-bottom: 6px;">
+                  <span style="color: var(--accent-cyan);">Ingress (DL): <span id="rep-wan-dl-pct">--%</span></span>
+                  <span style="color: var(--accent-purple);">Egress (UL): <span id="rep-wan-ul-pct">--%</span></span>
+                </div>
+                <div style="height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); display: flex; overflow: hidden;">
+                  <div id="rep-wan-bar-dl" style="width: 85%; background: var(--accent-cyan); height: 100%; transition: width 0.4s ease;"></div>
+                  <div id="rep-wan-bar-ul" style="width: 15%; background: var(--accent-purple); height: 100%; transition: width 0.4s ease;"></div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Total WAN Downloaded</div>
+                  <div id="rep-wan-dl-vol" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-cyan); margin-top: 2px;">--</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Total WAN Uploaded</div>
+                  <div id="rep-wan-ul-vol" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-purple); margin-top: 2px;">--</div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+              Captured via direct IF-MIB 64-bit octet counters
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. Mid Grid: Lifestyle Patterns & Fleet Category Share -->
+        <div class="grid grid-cols-2" style="margin-bottom: 24px; gap: 20px;">
+          
+          <!-- Lifestyle Consumption Patterns (Weekday vs Weekend) -->
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <div style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); padding: 8px; border-radius: 8px; display: inline-flex;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div>
+                <h4 style="font-size: 0.98rem; font-weight: 600; margin: 0;">Lifestyle Consumption Patterns</h4>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Weekday vs. Weekend Network Usage Profile</div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <div style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Weekday Avg (Mon-Fri)</div>
+                <div id="rep-weekday-avg" style="font-size: 1.35rem; font-weight: 700; color: var(--accent-blue); margin-top: 4px;">--</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">Typical daily volume</div>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <div style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Weekend Avg (Sat-Sun)</div>
+                <div id="rep-weekend-avg" style="font-size: 1.35rem; font-weight: 700; color: var(--accent-amber); margin-top: 4px;">--</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">Typical daily volume</div>
+              </div>
+            </div>
+
+            <div id="rep-pattern-callout" style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--accent-blue); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 0.82rem; color: var(--text-secondary);">
+              Analyzing historical weekday vs. weekend differential...
+            </div>
+          </div>
+
+          <!-- Fleet Category Bandwidth Distribution -->
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <div style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 8px; border-radius: 8px; display: inline-flex;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </div>
+              <div>
+                <h4 style="font-size: 0.98rem; font-weight: 600; margin: 0;">Fleet Category Bandwidth Share</h4>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Proportional usage across hardware classes</div>
+              </div>
+            </div>
+
+            <div id="rep-categories-list" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 4. Deep Audits Grid: Off-Hours Overnight Traffic & Dormant Devices -->
+        <div class="grid grid-cols-2" style="margin-bottom: 24px; gap: 20px;">
+          
+          <!-- Off-Hours / Overnight Traffic Audit (1 AM - 6 AM) -->
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 8px; border-radius: 8px; display: inline-flex;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </div>
+                <div>
+                  <h4 style="font-size: 0.98rem; font-weight: 600; margin: 0;">Off-Hours Overnight Audit</h4>
+                  <div style="font-size: 0.78rem; color: var(--text-muted);">Sleep hours traffic (01:00 - 06:00) · Ghost activity</div>
+                </div>
+              </div>
+              <div id="rep-overnight-total" style="font-size: 0.82rem; font-weight: 700; color: var(--accent-purple); background: rgba(139, 92, 246, 0.12); padding: 4px 10px; border-radius: 6px;">-- Total</div>
+            </div>
+
+            <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>IP</th>
+                    <th>Class</th>
+                    <th>Overnight Vol</th>
+                    <th>% Share</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-overnight-tbody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Scanning overnight telemetry...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Dormant Devices Audit (> 14 Days) -->
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+              <div style="background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); padding: 8px; border-radius: 8px; display: inline-flex;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div>
+                <h4 style="font-size: 0.98rem; font-weight: 600; margin: 0;">Dormant Devices Audit</h4>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Inactive on the local network for &gt; 14 days</div>
+              </div>
+            </div>
+
+            <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>IP</th>
+                    <th>Category</th>
+                    <th>Dormant Period</th>
+                  </tr>
+                </thead>
+                <tbody id="dormant-devices-tbody">
+                  <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">Checking device activity records...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </section>
 

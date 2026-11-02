@@ -1606,27 +1606,169 @@ async function loadReports() {
     if (!res.ok) return;
     const rep = await res.json();
 
-    document.getElementById('rep-busiest-hour').textContent = rep.busiest_hour_today;
-    document.getElementById('rep-busiest-data').textContent = `${rep.busiest_hour_data} consumed`;
+    // 1. Executive Smart Takeaways
+    const takeawaysEl = document.getElementById('reports-takeaways-container');
+    if (takeawaysEl && rep.takeaways) {
+      const getTakeawayIcon = (iconName) => {
+        if (iconName === 'shield') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
+        if (iconName === 'alert') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        if (iconName === 'trend') return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>';
+        return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+      };
 
-    document.getElementById('rep-top-today').textContent = rep.top_device_today;
-    document.getElementById('rep-top-today-data').textContent = `${rep.top_device_today_data} consumed today`;
-
-    document.getElementById('rep-top-month').textContent = rep.top_device_month;
-    document.getElementById('rep-top-month-data').textContent = `${rep.top_device_month_data} consumed this month`;
-
-    const tbody = document.getElementById('dormant-devices-tbody');
-    if (rep.dormant_devices.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-green); padding: 20px;">All discovered devices have been active within the past 7 days.</td></tr>`;
-    } else {
-      tbody.innerHTML = rep.dormant_devices.map(d => `
-        <tr>
-          <td><strong>${escapeHtml(d.custom_name)}</strong></td>
-          <td class="mono-cell">${d.ip}</td>
-          <td class="mono-cell">${d.mac}</td>
-          <td>${timeAgo(d.last_seen)}</td>
-        </tr>
+      takeawaysEl.innerHTML = rep.takeaways.map(t => `
+        <div class="takeaway-card">
+          <div class="takeaway-icon" style="background: ${t.color}22; color: ${t.color};">
+            ${getTakeawayIcon(t.icon)}
+          </div>
+          <div>
+            <div class="takeaway-title" style="color: ${t.color};">${escapeHtml(t.title)}</div>
+            <div class="takeaway-desc">${escapeHtml(t.text)}</div>
+          </div>
+        </div>
       `).join('');
+    }
+
+    // 2. ISP SLA Scorecard
+    if (rep.sla) {
+      const gradeBadge = document.getElementById('rep-sla-grade-badge');
+      if (gradeBadge) {
+        gradeBadge.textContent = rep.sla.grade;
+        gradeBadge.style.color = rep.sla.grade_color;
+        gradeBadge.style.background = `${rep.sla.grade_color}22`;
+        gradeBadge.style.borderColor = `${rep.sla.grade_color}44`;
+      }
+      const uptimeEl = document.getElementById('rep-sla-uptime');
+      if (uptimeEl) {
+        uptimeEl.textContent = `${rep.sla.uptime_pct}%`;
+        uptimeEl.style.color = rep.sla.grade_color;
+      }
+      const mttrEl = document.getElementById('rep-sla-mttr');
+      if (mttrEl) mttrEl.textContent = rep.sla.avg_mttr_human || 'None';
+      const pingLossEl = document.getElementById('rep-sla-ping-loss');
+      if (pingLossEl) pingLossEl.textContent = `${rep.sla.avg_latency_ms}ms / ${rep.sla.avg_loss_pct}%`;
+      const jitterEl = document.getElementById('rep-sla-jitter');
+      if (jitterEl) jitterEl.textContent = rep.sla.peak_jitter_window;
+    }
+
+    // 3. Bandwidth Forecast
+    if (rep.forecast) {
+      const projEl = document.getElementById('rep-forecast-projected');
+      if (projEl) projEl.textContent = rep.forecast.projected_monthly_human;
+      const dailyEl = document.getElementById('rep-forecast-daily');
+      if (dailyEl) dailyEl.textContent = `${rep.forecast.daily_avg_human} / day`;
+      const mtdEl = document.getElementById('rep-forecast-mtd');
+      if (mtdEl) mtdEl.textContent = rep.forecast.mtd_human;
+    }
+
+    // 4. WAN Ingress vs Egress (SNMP ppp0)
+    if (rep.wan_ratio) {
+      const ratioBadge = document.getElementById('rep-wan-ratio-badge');
+      if (ratioBadge) ratioBadge.textContent = `${rep.wan_ratio.ratio_str} Ratio`;
+      const dlPctEl = document.getElementById('rep-wan-dl-pct');
+      if (dlPctEl) dlPctEl.textContent = `${rep.wan_ratio.dl_pct}%`;
+      const ulPctEl = document.getElementById('rep-wan-ul-pct');
+      if (ulPctEl) ulPctEl.textContent = `${rep.wan_ratio.ul_pct}%`;
+
+      const barDl = document.getElementById('rep-wan-bar-dl');
+      if (barDl) barDl.style.width = `${Math.max(5, rep.wan_ratio.dl_pct)}%`;
+      const barUl = document.getElementById('rep-wan-bar-ul');
+      if (barUl) barUl.style.width = `${Math.max(5, rep.wan_ratio.ul_pct)}%`;
+
+      const dlVol = document.getElementById('rep-wan-dl-vol');
+      if (dlVol) dlVol.textContent = rep.wan_ratio.dl_bytes_human;
+      const ulVol = document.getElementById('rep-wan-ul-vol');
+      if (ulVol) ulVol.textContent = rep.wan_ratio.ul_bytes_human;
+    }
+
+    // 5. Lifestyle Patterns (Weekday vs Weekend)
+    if (rep.patterns) {
+      const wdEl = document.getElementById('rep-weekday-avg');
+      if (wdEl) wdEl.textContent = rep.patterns.weekday_avg_human;
+      const weEl = document.getElementById('rep-weekend-avg');
+      if (weEl) weEl.textContent = rep.patterns.weekend_avg_human;
+      const noteEl = document.getElementById('rep-pattern-callout');
+      if (noteEl) noteEl.textContent = rep.patterns.pattern_note;
+    }
+
+    // 6. Category Bandwidth Share
+    const catListEl = document.getElementById('rep-categories-list');
+    if (catListEl && rep.categories) {
+      if (rep.categories.length === 0) {
+        catListEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 12px 0;">No category traffic recorded yet.</div>';
+      } else {
+        const catPalette = {
+          'desktop': 'var(--accent-blue)',
+          'laptop': 'var(--accent-cyan)',
+          'mobile': 'var(--accent-purple)',
+          'tv': 'var(--accent-amber)',
+          'iot': 'var(--accent-green)',
+          'unknown': 'var(--text-muted)'
+        };
+        catListEl.innerHTML = rep.categories.map(c => {
+          const catKey = (c.category || 'unknown').toLowerCase();
+          const color = catPalette[catKey] || 'var(--accent-blue)';
+          const catLabel = catKey.charAt(0).toUpperCase() + catKey.slice(1);
+          const devCount = c.device_count || c.count || 1;
+          return `
+            <div class="cat-dist-row">
+              <div class="cat-dist-meta">
+                <span style="font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                  <span class="category-badge ${catKey}" style="font-size: 0.7rem; padding: 1px 7px;">${catLabel}</span>
+                  <span style="font-size: 0.76rem; color: var(--text-muted);">(${devCount} device${devCount > 1 ? 's' : ''})</span>
+                </span>
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">
+                  ${c.bytes_human} <span style="font-weight: 500; color: var(--text-muted); font-size: 0.74rem;">(${c.pct}%)</span>
+                </span>
+              </div>
+              <div class="cat-dist-bar-track">
+                <div class="cat-dist-bar-fill" style="width: ${Math.max(2, c.pct)}%; background: ${color};"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 7. Overnight Traffic Audit
+    const overnightTotalEl = document.getElementById('rep-overnight-total');
+    if (overnightTotalEl && rep.overnight) {
+      overnightTotalEl.textContent = `${rep.overnight.total_bytes_human} Active`;
+    }
+    const overnightTbody = document.getElementById('rep-overnight-tbody');
+    if (overnightTbody && rep.overnight) {
+      if (!rep.overnight.devices || rep.overnight.devices.length === 0) {
+        overnightTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-green); padding: 16px;">Zero background traffic detected during overnight hours (01:00 - 06:00).</td></tr>`;
+      } else {
+        overnightTbody.innerHTML = rep.overnight.devices.map(d => `
+          <tr>
+            <td><strong>${escapeHtml(d.name)}</strong></td>
+            <td class="mono-cell">${d.ip}</td>
+            <td><span class="category-badge ${d.category.toLowerCase()}" style="font-size: 0.7rem; padding: 1px 6px;">${d.category}</span></td>
+            <td style="font-weight: 600; color: var(--accent-purple);">${d.bytes_human}</td>
+            <td class="mono-cell">${d.pct}%</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // 8. Dormant Devices Audit (> 14 Days)
+    const dormantTbody = document.getElementById('dormant-devices-tbody');
+    if (dormantTbody && rep.dormant_devices) {
+      if (rep.dormant_devices.length === 0) {
+        dormantTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-green); padding: 20px;">All discovered devices active within the last 14 days. No stale nodes.</td></tr>`;
+      } else {
+        dormantTbody.innerHTML = rep.dormant_devices.map(d => `
+          <tr>
+            <td><strong>${escapeHtml(d.custom_name)}</strong></td>
+            <td class="mono-cell">${d.ip}</td>
+            <td><span class="category-badge ${(d.category || 'unknown').toLowerCase()}" style="font-size: 0.7rem; padding: 1px 6px;">${d.category || 'Unknown'}</span></td>
+            <td style="color: var(--accent-rose); font-weight: 500;">
+              ${d.days_dormant} days ago <span style="font-size: 0.72rem; color: var(--text-muted);">(${timeAgo(d.last_seen)})</span>
+            </td>
+          </tr>
+        `).join('');
+      }
     }
   } catch (e) {
     console.error("Reports error:", e);
