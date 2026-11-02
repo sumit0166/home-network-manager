@@ -879,18 +879,111 @@ async function openDeviceDetail(mac) {
   switchView('device-detail');
 }
 
+// Custom Device Picker Functions
+function toggleDevicePicker(e) {
+  if (e) e.stopPropagation();
+  const trigger = document.getElementById('picker-trigger');
+  const dropdown = document.getElementById('picker-dropdown');
+  if (!trigger || !dropdown) return;
+  const isOpen = dropdown.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+  if (isOpen) {
+    const searchInput = document.getElementById('picker-search-input');
+    if (searchInput) {
+      searchInput.value = '';
+      filterDevicePicker('');
+      setTimeout(() => searchInput.focus(), 60);
+    }
+  }
+}
+
+function closeDevicePicker() {
+  const trigger = document.getElementById('picker-trigger');
+  const dropdown = document.getElementById('picker-dropdown');
+  if (trigger) trigger.classList.remove('open');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+function filterDevicePicker(query) {
+  const q = (query || '').toLowerCase().trim();
+  const items = document.querySelectorAll('.picker-item');
+  items.forEach(item => {
+    const name = item.dataset.name || '';
+    const ip = item.dataset.ip || '';
+    if (!q || name.includes(q) || ip.includes(q)) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function selectDeviceFromPicker(mac) {
+  closeDevicePicker();
+  if (mac && mac !== currentDetailMac) {
+    currentDetailMac = mac;
+    loadDeviceDetail(mac);
+  }
+}
+
+function renderDevicePicker(selectedMac) {
+  const currentDev = allDevicesCache.find(d => d.mac === selectedMac);
+  const dot = document.getElementById('picker-trigger-dot');
+  const nameEl = document.getElementById('picker-trigger-name');
+  const ipEl = document.getElementById('picker-trigger-ip');
+
+  if (currentDev) {
+    if (dot) dot.className = `picker-dot ${currentDev.is_active ? 'online' : 'offline'}`;
+    if (nameEl) nameEl.textContent = currentDev.custom_name;
+    if (ipEl) ipEl.textContent = `(${currentDev.ip})`;
+  } else if (allDevicesCache.length > 0) {
+    const d0 = allDevicesCache[0];
+    if (dot) dot.className = `picker-dot ${d0.is_active ? 'online' : 'offline'}`;
+    if (nameEl) nameEl.textContent = d0.custom_name;
+    if (ipEl) ipEl.textContent = `(${d0.ip})`;
+  }
+
+  const listContainer = document.getElementById('picker-list');
+  if (listContainer && allDevicesCache.length > 0) {
+    const sorted = [...allDevicesCache].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0));
+    listContainer.innerHTML = sorted.map(d => {
+      const isSelected = d.mac === selectedMac;
+      const isUp = Boolean(d.is_active);
+      return `
+        <div class="picker-item ${isSelected ? 'active' : ''}" 
+             data-name="${escapeHtml((d.custom_name || '').toLowerCase())}" 
+             data-ip="${d.ip || ''}" 
+             onclick="selectDeviceFromPicker('${d.mac}')">
+          <div class="picker-item-left">
+            <span class="picker-dot ${isUp ? 'online' : 'offline'}"></span>
+            <div>
+              <div class="picker-item-name">${escapeHtml(d.custom_name)}</div>
+              <div class="picker-item-ip">${d.ip}</div>
+            </div>
+          </div>
+          <span class="picker-item-badge ${isUp ? 'online' : 'offline'}">
+            ${isUp ? 'Online' : 'Offline'}
+          </span>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
 async function loadDeviceDetail(mac) {
+  // Ensure devices cache is ready
+  if (!allDevicesCache || allDevicesCache.length === 0) {
+    try {
+      const res = await fetch('/api/devices');
+      if (res.ok) allDevicesCache = await res.json();
+    } catch (e) {}
+  }
+
   if (!mac) {
     mac = currentDetailMac;
   }
   // If still no mac supplied, select first active or available device
   if (!mac) {
-    if (allDevicesCache.length === 0) {
-      try {
-        const res = await fetch('/api/devices');
-        if (res.ok) allDevicesCache = await res.json();
-      } catch (e) {}
-    }
     const first = allDevicesCache.find(d => d.is_active) || allDevicesCache[0];
     if (first) {
       mac = first.mac;
@@ -908,21 +1001,8 @@ async function loadDeviceDetail(mac) {
     backLabel.textContent = (previousView === 'dashboard') ? 'Back to Dashboard' : 'Back to Devices';
   }
 
-  // Populate device switcher dropdown
-  const selector = document.getElementById('telemetry-device-select');
-  if (selector && allDevicesCache.length > 0) {
-    const sorted = [...allDevicesCache].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0));
-    selector.innerHTML = sorted.map(d => `
-      <option value="${d.mac}" ${d.mac === mac ? 'selected' : ''}>
-        ${d.is_active ? '🟢 [Online]' : '🔴 [Offline]'} ${escapeHtml(d.custom_name)} (${d.ip})
-      </option>
-    `).join('');
-    selector.value = mac;
-    selector.onchange = (e) => {
-      currentDetailMac = e.target.value;
-      loadDeviceDetail(e.target.value);
-    };
-  }
+  // Update custom device picker trigger & dropdown items
+  renderDevicePicker(mac);
 
   try {
     const res = await fetch(`/api/devices/${encodeURIComponent(mac)}`);
@@ -1976,6 +2056,20 @@ document.addEventListener('DOMContentLoaded', () => {
       alert("Settings saved successfully! The collector is reconnecting...");
       loadSettings();
       pollStatus();
+    }
+  });
+
+  // Close custom device picker on outside click or Escape
+  document.addEventListener('click', (e) => {
+    const picker = document.getElementById('custom-device-picker');
+    if (picker && !picker.contains(e.target)) {
+      closeDevicePicker();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDevicePicker();
     }
   });
 

@@ -335,12 +335,31 @@
             <span id="telemetry-back-label">Back to Devices</span>
           </button>
           
-          <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 4px 14px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan); flex-shrink: 0;"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
-            <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Switch Device:</span>
-            <select id="telemetry-device-select" class="form-control" style="width: 290px; padding: 6px 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-primary); cursor: pointer; outline: none;">
-              <!-- Populated dynamically -->
-            </select>
+          <!-- Custom Sleek Device Selector Dropdown -->
+          <div class="custom-device-picker" id="custom-device-picker">
+            <span class="picker-label">Switch Device:</span>
+            <div class="picker-wrapper">
+              <button type="button" class="picker-trigger" id="picker-trigger" onclick="toggleDevicePicker(event)">
+                <span class="picker-dot online" id="picker-trigger-dot"></span>
+                <span class="picker-device-name" id="picker-trigger-name">Select Device</span>
+                <span class="picker-device-ip" id="picker-trigger-ip"></span>
+                <svg class="picker-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              </button>
+
+              <div class="picker-dropdown" id="picker-dropdown">
+                <div class="picker-search-wrap">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                  </svg>
+                  <input type="text" id="picker-search-input" placeholder="Search devices by name or IP..." oninput="filterDevicePicker(this.value)">
+                </div>
+                <div class="picker-list" id="picker-list">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
